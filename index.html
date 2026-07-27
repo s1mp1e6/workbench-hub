@@ -481,8 +481,10 @@
   .menu-toggle{display:none;position:fixed;top:14px;left:14px;z-index:50;width:36px;height:36px;border-radius:8px;background:#fff;border:1px solid var(--line);align-items:center;justify-content:center;font-size:18px;color:var(--ink)}
   @media(max-width:900px){
     .menu-toggle{display:flex}
+    .sidebar.open~.menu-toggle{display:none}
     #backBtn.menu-toggle{display:none}
     #backBtn.menu-toggle.active{display:flex}
+    .sidebar.open~#backBtn.menu-toggle.active{display:none}
     .sidebar{transform:translateX(-100%)}
     .sidebar.open{transform:translateX(0);box-shadow:0 0 30px rgba(0,0,0,.15)}
     .main{margin-left:0}
@@ -1520,7 +1522,15 @@ function resetToday(){document.getElementById('modalTitle').textContent='↻ 重
   document.getElementById('modeHint').textContent='';
   document.getElementById('modalSave').onclick=()=>{modules.forEach(mid=>{if(document.getElementById('rm_'+mid)&&document.getElementById('rm_'+mid).checked){const m=state.modules[mid];m.items=m.items.filter(x=>!x.done&&x.status!=='已完成');if(m.type==='experiment')m.items.forEach(item=>{item.logs=(item.logs||[]).filter(l=>l.progress<100);recalcSummary(item,m.type)})}});if(modules.some(mid=>document.getElementById('rm_'+mid)&&document.getElementById('rm_'+mid).checked)){save();closeModal();renderContent();renderNav();toast('已重置勾选项')}else{toast('未选择任何项')}};
   document.getElementById('mask').classList.add('show');}
-function exportData(){try{const json=JSON.stringify(state,null,2);const blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();setTimeout(()=>{try{window.location.href=url}catch(e){}},100);setTimeout(()=>{try{if(document.querySelector('a[download]')){const ta=document.createElement('textarea');ta.value=json;ta.style.position='fixed';ta.style.top='-999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('📋 已复制到剪贴板')}}catch(e){}},3000);toast('⬇️ 数据已导出')}catch(e){toast('⚠️ 导出失败');try{const w=window.open('','_blank');w.document.write('<pre>'+esc(JSON.stringify(state,null,2))+'</pre>')}catch(e2){}}}
+function exportData(){try{const json=JSON.stringify(state,null,2);
+  // Android 原生下载
+  try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.isAndroid()){const b64=window.btoa(unescape(encodeURIComponent(json)));AndroidBridge.downloadFile('workbench_'+today()+'.json',b64);toast('⬇️ 下载中...');return}}catch(e){}
+  const blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();
+  setTimeout(()=>{try{const w=window.open(url);if(w)setTimeout(()=>w.close(),100)}catch(e){}},200);
+  setTimeout(()=>{try{window.location.href=url}catch(e){}},400);
+  setTimeout(()=>{try{const ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('📋 已复制，请粘贴保存')}catch(e){}},3000);
+  setTimeout(()=>URL.revokeObjectURL(url),5000);toast('⬇️ 导出中...')}catch(e){toast('⚠️ 导出失败，请使用设置中的导出功能')}}
 function importData(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(data&&data.modules){data.moduleOrder=(data.moduleOrder||[]).filter(mid=>data.modules[mid]);if(!data.dashWidgets)data.dashWidgets=[];if(!data.customQuotes||!data.customQuotes.length)data.customQuotes=[{text:'科研不是百米冲刺，是一场马拉松。每天进步一点点，终会抵达。',author:'佚名'}];state=data;save();renderNav();renderContent();toast('数据已导入')}else toast('文件格式不正确')}catch(err){toast('导入失败：'+err.message)}};reader.readAsText(file);e.target.value='';}
 function updateStorageInfo(){try{const size=new Blob([JSON.stringify(state)]).size;document.getElementById('storageInfo').textContent=(size/1024).toFixed(1)+'KB'}catch(e){}}
 
