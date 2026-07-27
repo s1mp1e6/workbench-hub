@@ -666,6 +666,8 @@ if('serviceWorker' in navigator){
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').style.display='';toast('📲 点击「安装」按钮可将工作台添加到桌面')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(c=>{deferredPrompt=null;document.getElementById('installBtn').style.display='none';if(c.outcome==='accepted')toast('✅ 已安装到桌面')})}
 const KEY='personal_hub_v6';
+const APP_VERSION='1.0.0';
+const APP_REPO='s1mp1e6/workbench-hub';
 let state=load();
 let _dashClockEl=null,_dashDateEl=null,_dashGreetEl=null;
 const debounce=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
@@ -1573,7 +1575,7 @@ ${_customFileHandle?`<div style="font-size:11px;color:var(--green);padding:6px 0
 <div style="padding:12px 0 0;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint);line-height:1.7">💡 <b>存储位置说明</b>：数据存储在手机本地（localStorage/IndexedDB），导出备份只是副本。<br>💡 <b>迁移数据</b>：在 localStorage 和 IndexedDB 之间转移已有数据。</div>
 <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
 <div class="field"><label>☁️ GitHub Gist 同步</label><input id="s_gistToken" placeholder="GitHub Token（需勾选 gist 权限）" value="${esc(localStorage.getItem('ph_gist_token')||'')}" style="margin-bottom:6px"><div style="font-size:11px;color:var(--ink-faint);margin-top:4px">1️⃣ 输入 Token → 点「测试」验证 → 点「上传」创建备份<br>2️⃣ 另一设备输入同 Token → 点「查找」自动找回</div></div>
-<div class="field" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="gistSave()" style="flex:1">☁️ 上传</button><button class="btn ghost" onclick="gistFind()" style="flex:1">🔍 查找</button><button class="btn ghost" onclick="gistTest()" style="flex:1">🔌 测试</button></div>
+<div class="field" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="gistSave()" style="flex:1">☁️ 上传</button><button class="btn ghost" onclick="gistFind()" style="flex:1">🔍 查找</button><button class="btn ghost" onclick="gistTest()" style="flex:1">🔌 测试</button><button class="btn ghost" onclick="checkUpdate()" style="flex:1">🔄 检查更新</button></div>
 <div id="s_gistStatus" style="font-size:11px;color:var(--ink-faint);padding:4px 0"></div>
 `;
   document.getElementById('modeHint').textContent='';
@@ -1595,6 +1597,7 @@ function gistTest(){const el=document.getElementById('s_gistStatus');if(!el)retu
 function gistSave(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 上传中...';const data=JSON.stringify(state,null,2);const gistId=localStorage.getItem('ph_gist_id');const body=gistId?{files:{'hub-data.json':{content:data}}}:{description:'Personal Hub Backup',public:false,files:{'hub-data.json':{content:data}}};(gistId?gistApi('/gists/'+gistId,'PATCH',body):gistApi('/gists','POST',body)).then(r=>{if(!gistId&&r.id){localStorage.setItem('ph_gist_id',r.id)}el.textContent='✅ 已同步';toast('☁️ 已同步到 GitHub Gist')}).catch(e=>{el.textContent='❌ '+e.message})}
 function gistLoad(){const el=document.getElementById('s_gistStatus');if(!el)return;const id=localStorage.getItem('ph_gist_id');if(!id){el.textContent='❌ 无 Gist ID';return}el.textContent='⏳ 下载中...';gistApi('/gists/'+id,'GET').then(r=>{if(r&&r.files&&r.files['hub-data.json']){const c=JSON.parse(r.files['hub-data.json'].content);if(c&&c.modules){state=c;save();renderNav();renderContent();el.textContent='✅ 已恢复'}else el.textContent='❌ 数据格式错误'}else el.textContent='❌ 未找到数据'}).catch(e=>{el.textContent='❌ '+e.message})}
 function gistFind(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 查找中...';gistApi('/gists?per_page=50','GET').then(list=>{const match=list.find(g=>g.files&&g.files['hub-data.json']);if(match){localStorage.setItem('ph_gist_id',match.id);el.textContent='✅ 找到备份 Gist：'+match.id;toast('✅ 找到备份，正在下载...');gistLoad()}else{el.textContent='❌ 未找到备份 Gist，请先在其他设备上传'}}).catch(e=>{el.textContent='❌ '+e.message})}
+function checkUpdate(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 检查更新...';fetch('https://raw.githubusercontent.com/'+APP_REPO+'/gh-pages/version.json').then(r=>r.json()).then(v=>{if(v.version>APP_VERSION){el.innerHTML='✅ 发现新版本 '+v.version+'（当前 '+APP_VERSION+'）<br><a href="https://github.com/'+APP_REPO+'/releases" target="_blank" style="color:var(--accent)">点此查看更新</a> | 刷新页面即可应用';toast('🔄 新版本 '+v.version+' 可用，请刷新页面')}else{el.textContent='✅ 已是最新版 '+APP_VERSION;toast('✅ 已是最新版')}}).catch(e=>{el.textContent='❌ 检查失败：'+e.message})}
 /* 批量选择 */
 let batchMode=false,batchSelected=[];
 document.addEventListener('click',e=>{if(batchMode){const card=e.target.closest('.card');if(card){const id=card.dataset.id;if(id){const idx=batchSelected.indexOf(id);if(idx>=0)batchSelected.splice(idx,1);else batchSelected.push(id);card.classList.toggle('batch-sel',idx<0);toast('已选 '+batchSelected.length+' 项')}}}});
