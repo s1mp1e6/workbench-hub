@@ -59,8 +59,15 @@
   .theme-pink .mb-btn.primary{background:linear-gradient(135deg,#ad1a72,#8a105a)}
   .theme-pink .topbar h2 .bt{background:linear-gradient(90deg,#ad1a72,#8a105a);-webkit-background-clip:text}
   .theme-pink .sidebar .logo{background:linear-gradient(135deg,#ad1a72 0%,#8a105a 100%)}
-  /* 默认主题（深蓝） */
-  .sidebar .logo{background:linear-gradient(135deg,#2383e2 0%,#6940a5 50%,#d9730d 100%)}
+  /* 暗色模式下主题色微调 */
+  .dark.theme-green{--accent:#6ade90;--accent-soft:#1a4a2a}
+  .dark.theme-orange{--accent:#ffa050;--accent-soft:#5c2d10}
+  .dark.theme-purple{--accent:#b090ff;--accent-soft:#2e1070}
+  .dark.theme-pink{--accent:#f788c8;--accent-soft:#5c0e3a}
+  .theme-default{--accent:#2383e2;--accent-soft:#e8f1fb;--green:#0f7b3d;--orange:#d9730d;--purple:#6940a5;--pink:#ad1a72}
+  .theme-default .fab{background:linear-gradient(135deg,#2383e2,#1a6fc0)}
+  .theme-default .mb-btn.primary{background:linear-gradient(135deg,#2383e2,#1a6fc0)}
+  .theme-default .topbar h2 .bt{background:linear-gradient(90deg,#2383e2,#6940a5);-webkit-background-clip:text}
   @supports(height:100dvh){:root{--dvh:100dvh}}@supports not(height:100dvh){:root{--dvh:100vh}}
 
 /* 暗色模式 — 统一 .dark 类和系统偏好 */
@@ -1555,8 +1562,8 @@ function openSettings(){
 ${_customFileHandle?`<div style="font-size:11px;color:var(--green);padding:6px 0">✅ 已设置自动备份文件：每次保存自动同步</div>`:canFA?'':'<div style="font-size:11px;color:var(--ink-faint);padding:6px 0">💡 点击「导出备份」下载当前数据的 JSON 副本</div>'}
 <div style="padding:12px 0 0;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint);line-height:1.7">💡 <b>存储位置说明</b>：数据存储在手机本地（localStorage/IndexedDB），导出备份只是副本。<br>💡 <b>迁移数据</b>：在 localStorage 和 IndexedDB 之间转移已有数据。</div>
 <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
-<div class="field"><label>☁️ GitHub Gist 同步</label><input id="s_gistToken" placeholder="GitHub Personal Access Token（需要 gist 权限）" value="${esc(localStorage.getItem('ph_gist_token')||'')}" style="margin-bottom:6px"><input id="s_gistId" placeholder="Gist ID（留空自动创建）" value="${esc(localStorage.getItem('ph_gist_id')||'')}"><div style="font-size:11px;color:var(--ink-faint);margin-top:4px">💡 Token 和 Gist ID 仅存储在本地，不会上传到第三方</div></div>
-<div class="field" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="gistSave()" style="flex:1">☁️ 上传到 Gist</button><button class="btn ghost" onclick="gistLoad()" style="flex:1">⬇️ 从 Gist 下载</button></div>
+<div class="field"><label>☁️ GitHub Gist 同步</label><input id="s_gistToken" placeholder="GitHub Token（需勾选 gist 权限）" value="${esc(localStorage.getItem('ph_gist_token')||'')}" style="margin-bottom:6px"><div style="font-size:11px;color:var(--ink-faint);margin-top:4px">1️⃣ 输入 Token → 点「上传」自动创建备份<br>2️⃣ 另一设备输入同 Token → 点「查找」自动找回</div></div>
+<div class="field" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="gistSave()" style="flex:1">☁️ 上传到 Gist</button><button class="btn ghost" onclick="gistFind()" style="flex:1">🔍 查找我的 Gist</button></div>
 <div id="s_gistStatus" style="font-size:11px;color:var(--ink-faint);padding:4px 0"></div>
 `;
   document.getElementById('modeHint').textContent='';
@@ -1566,7 +1573,6 @@ ${_customFileHandle?`<div style="font-size:11px;color:var(--green);padding:6px 0
 }
 function saveSettings(){const v=document.getElementById('s_backend').value;if((v==='idb')!==_useIDB){_useIDB=v==='idb';localStorage.setItem('ph_use_idb',_useIDB?'1':'');toast('已切换存储引擎，点击「迁移数据」搬移现有数据')}
   const tk=document.getElementById('s_gistToken');if(tk){localStorage.setItem('ph_gist_token',tk.value.trim())}
-  const gi=document.getElementById('s_gistId');if(gi){localStorage.setItem('ph_gist_id',gi.value.trim())}
   const th=document.getElementById('s_theme');if(th){localStorage.setItem('ph_theme_color',th.value);applyTheme(th.value)}
 closeModal()}
 /* Gist 同步 */
@@ -1574,6 +1580,7 @@ let _gistCache=null;
 function gistApi(path,method,body){const token=localStorage.getItem('ph_gist_token');if(!token){const s=document.getElementById('s_gistStatus');if(s)s.textContent='❌ 请先输入 GitHub Token';return Promise.reject()}return fetch('https://api.github.com'+path,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
 function gistSave(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 上传中...';const data=JSON.stringify(state,null,2);const gistId=localStorage.getItem('ph_gist_id');const body=gistId?{files:{'hub-data.json':{content:data}}}:{description:'Personal Hub Backup',public:false,files:{'hub-data.json':{content:data}}};(gistId?gistApi('/gists/'+gistId,'PATCH',body):gistApi('/gists','POST',body)).then(r=>{if(!gistId&&r.id){localStorage.setItem('ph_gist_id',r.id);const inp=document.getElementById('s_gistId');if(inp)inp.value=r.id}el.textContent='✅ 已同步';toast('☁️ 已同步到 GitHub Gist')}).catch(e=>{el.textContent='❌ '+e.message})}
 function gistLoad(){const el=document.getElementById('s_gistStatus');if(!el)return;const id=localStorage.getItem('ph_gist_id');if(!id){el.textContent='❌ 无 Gist ID';return}el.textContent='⏳ 下载中...';gistApi('/gists/'+id,'GET').then(r=>{if(r&&r.files&&r.files['hub-data.json']){const c=JSON.parse(r.files['hub-data.json'].content);if(c&&c.modules){state=c;save();renderNav();renderContent();el.textContent='✅ 已恢复'}else el.textContent='❌ 数据格式错误'}else el.textContent='❌ 未找到数据'}).catch(e=>{el.textContent='❌ '+e.message})}
+function gistFind(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 查找中...';gistApi('/gists?per_page=50','GET').then(list=>{const match=list.find(g=>g.files&&g.files['hub-data.json']);if(match){localStorage.setItem('ph_gist_id',match.id);el.textContent='✅ 找到备份 Gist：'+match.id;toast('✅ 找到备份，正在下载...');gistLoad()}else{el.textContent='❌ 未找到备份 Gist，请先在其他设备上传'}}).catch(e=>{el.textContent='❌ '+e.message})}
 /* 批量选择 */
 let batchMode=false,batchSelected=[];
 document.addEventListener('click',e=>{if(batchMode){const card=e.target.closest('.card');if(card){const id=card.dataset.id;if(id){const idx=batchSelected.indexOf(id);if(idx>=0)batchSelected.splice(idx,1);else batchSelected.push(id);card.classList.toggle('batch-sel',idx<0);toast('已选 '+batchSelected.length+' 项')}}}});
@@ -1633,7 +1640,7 @@ function init(){renderNav();renderContent();updateClock();setInterval(updateCloc
 }
 function toggleTheme(){document.documentElement.classList.toggle('dark');localStorage.setItem('ph_theme_mode',document.documentElement.classList.contains('dark')?'dark':'light');updateThemeBtn()}
 function updateThemeBtn(){const btn=document.getElementById('themeToggle');if(btn)btn.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙'}
-function applyTheme(t){['default','green','orange','purple','pink'].forEach(th=>document.documentElement.classList.remove('theme-'+th));if(t&&t!=='default')document.documentElement.classList.add('theme-'+t)}
+function applyTheme(t){['default','green','orange','purple','pink'].forEach(th=>document.documentElement.classList.remove('theme-'+th));if(t)document.documentElement.classList.add('theme-'+(t==='default'?'default':t))}
 init();
 </script>
 </body>
