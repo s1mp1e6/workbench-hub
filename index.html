@@ -658,7 +658,10 @@
 let deferredPrompt=null;
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').then(reg=>console.log('SW注册成功')).catch(err=>console.log('SW注册失败:',err));
+    navigator.serviceWorker.register('sw.js?_t='+Date.now()).then(reg=>{
+      console.log('SW注册成功');
+      // 检测 SW 更新
+      reg.addEventListener('updatefound',()=>{const sw=reg.installing;sw.addEventListener('statechange',()=>{if(sw.state==='installed'&&navigator.serviceWorker.controller){toast('🔄 更新可用，关闭后重新打开生效')}})})}).catch(err=>console.log('SW注册失败:',err));
     // 后台预加载 OCR 库
     setTimeout(()=>{if(typeof Tesseract==='undefined'){const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';document.head.appendChild(s)}},3000);
   });
@@ -666,7 +669,7 @@ if('serviceWorker' in navigator){
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').style.display='';toast('📲 点击「安装」按钮可将工作台添加到桌面')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(c=>{deferredPrompt=null;document.getElementById('installBtn').style.display='none';if(c.outcome==='accepted')toast('✅ 已安装到桌面')})}
 const KEY='personal_hub_v6';
-const APP_VERSION='1.0.2';
+const APP_VERSION='1.0.3';
 const APP_REPO='s1mp1e6/workbench-hub';
 let state=load();
 let _dashClockEl=null,_dashDateEl=null,_dashGreetEl=null;
@@ -1651,6 +1654,8 @@ function init(){renderNav();renderContent();updateClock();setInterval(updateCloc
   setTimeout(()=>{if(!document.querySelector('link[rel=\"icon\"][type=\"image/png\"]')){const c=document.createElement('canvas');c.width=64;c.height=64;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,'#2383e2');g.addColorStop(.5,'#6940a5');g.addColorStop(1,'#d9730d');x.fillStyle=g;x.beginPath();x.roundRect(8,8,48,48,10);x.fill();x.fillStyle='#fff';x.font='30px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('✦',32,34);const url=c.toDataURL('image/png');const link=document.createElement('link');link.rel='icon';link.type='image/png';link.href=url;document.head.appendChild(link)}},500);
   // 异步加载 IndexedDB 数据（如果设置了）
   if(_useIDB){_idb.get(KEY).then(d=>{if(d){try{const s=JSON.parse(d);if(s&&s.modules){state=s;save();renderNav();renderContent()}}catch(e){}}}).catch(()=>{})}
+  // 自动检查更新（后台静默，不打扰用户）
+  setTimeout(()=>{fetch('https://raw.githubusercontent.com/'+APP_REPO+'/gh-pages/version.json?_t='+Date.now()).then(r=>r.json()).then(v=>{if(v.version>APP_VERSION){const b=document.createElement('div');b.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:210;background:var(--accent);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px';b.innerHTML='🔄 新版本 v'+v.version+' 可用 <span style="background:rgba(255,255,255,.2);padding:3px 10px;border-radius:6px;font-size:12px">刷新</span>';b.onclick=()=>location.reload();setTimeout(()=>{document.body.appendChild(b);setTimeout(()=>b.style.opacity='0',8000)},3000)}}).catch(()=>{})},4000);
   // 模态框自动聚焦
   const maskEl=document.getElementById('mask');new MutationObserver(()=>{if(maskEl.classList.contains('show'))setTimeout(()=>{const inp=maskEl.querySelector('input,textarea');if(inp)inp.focus()},120)}).observe(maskEl,{attributes:true,attributeFilter:['class']});
   // 全局快捷键
