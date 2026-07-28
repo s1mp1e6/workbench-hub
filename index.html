@@ -666,7 +666,7 @@ if('serviceWorker' in navigator){
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').style.display='';toast('📲 点击「安装」按钮可将工作台添加到桌面')});
 function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(c=>{deferredPrompt=null;document.getElementById('installBtn').style.display='none';if(c.outcome==='accepted')toast('✅ 已安装到桌面')})}
 const KEY='personal_hub_v6';
-const APP_VERSION='1.0.1';
+const APP_VERSION='1.0.2';
 const APP_REPO='s1mp1e6/workbench-hub';
 let state=load();
 let _dashClockEl=null,_dashDateEl=null,_dashGreetEl=null;
