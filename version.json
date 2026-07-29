@@ -1,1 +1,1 @@
-{"version":"1.1.0","notes":"8 fixes: exportData cleanup, importData double-confirm, saveItemForm preserve progress, showCalInfo ISO regex, init toast forceAppReload, hw-overlay z-index 250, lpAction quote guard, md2html form/button/input removal"}
+{"version":"1.1.1","notes":"7 fixes: saveLogForm order, performSearch soft-delete filter, saveUnifiedEdit validation, openLogModal null guard, mergeState quotes text-merge, delMod soft-delete, mergeState isDeleted filter"}
