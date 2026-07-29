@@ -1003,7 +1003,7 @@ function renderCard(item,type){
   }
   return '';
 }
-function toggleItem(id){const m=state.modules[currentMod];const it=m.items.find(x=>x.id===id);if(!it)return;it.done=!it.done;if(m.type==='task'&&it.done)it.status='done';save();renderNav();
+function toggleItem(id){const m=state.modules[currentMod];const it=m.items.find(x=>x.id===id);if(!it)return;it.done=!it.done;it.updatedAt=Date.now();if(m.type==='task'&&it.done)it.status='done';save();renderNav();
   // 乐观 DOM 更新
   document.querySelectorAll('.card .check').forEach(el=>{el.classList.toggle('done',it.done);el.innerHTML=checkSvg()});
   const txt=document.querySelector('.card[data-id="'+id+'"] .cbody > div > div:first-child');
@@ -1276,6 +1276,7 @@ function metaFields(type,item){
 }
 function saveUnifiedEdit(){
   const m=state.modules[currentMod];const type=m.type;const id=editingId;const item=m.items.find(x=>x.id===id);if(!item)return;
+  item.updatedAt=Date.now();
   // 先保存内容表单（复用已有字段逻辑）
   if(type==='task'){
     const txt=val('f_txt');if(txt)item.txt=txt;
@@ -1423,9 +1424,11 @@ function setupHandwrite(){
   const box=document.getElementById('hwBox');resizeCanvas(cvs,box);
   const ctx=cvs.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';
   const getP=e=>{const r=cvs.getBoundingClientRect();if(e.touches){const t=e.touches[0];return{x:t.clientX-r.left,y:t.clientY-r.top}}return{x:e.clientX-r.left,y:e.clientY-r.top}};
-  const start=e=>{e.preventDefault();hwState.isDrawing=true;const p=getP(e);hwState.currentPath=[p];ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle=hwState.color;ctx.lineWidth=hwState.width};
-  const move=e=>{e.preventDefault();if(!hwState.isDrawing)return;const p=getP(e);ctx.lineTo(p.x,p.y);ctx.stroke();hwState.currentPath.push(p)};
-  const end=e=>{e.preventDefault();if(!hwState.isDrawing)return;hwState.isDrawing=false;hwState.data.push({path:[...hwState.currentPath],color:hwState.color,width:hwState.width})};
+  let points=[],rafPending=false;
+  const flush=()=>{if(!points.length)return;ctx.beginPath();ctx.strokeStyle=hwState.color;ctx.lineWidth=hwState.width;points.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();points=[];rafPending=false};
+  const start=e=>{e.preventDefault();hwState.isDrawing=true;hwState.currentPath=[];points=[getP(e)];if(!rafPending){rafPending=true;requestAnimationFrame(flush)}};
+  const move=e=>{e.preventDefault();if(!hwState.isDrawing)return;const p=getP(e);points.push(p);hwState.currentPath.push(p);if(!rafPending){rafPending=true;requestAnimationFrame(flush)}};
+  const end=e=>{e.preventDefault();if(!hwState.isDrawing)return;hwState.isDrawing=false;rafPending&&flush();hwState.currentPath.length&&hwState.data.push({path:[...hwState.currentPath],color:hwState.color,width:hwState.width})};
   cvs.onmousedown=start;cvs.onmousemove=move;cvs.onmouseup=end;cvs.onmouseleave=end;
   cvs.ontouchstart=start;cvs.ontouchmove=move;cvs.ontouchend=end;
 }
@@ -1484,7 +1487,7 @@ function saveItemForm(){
   if(type==='diary'&&!contVal){toast('请输入日记内容');return}
   if((type==='note'||type==='paper')&&!contVal){toast('请输入内容');return}
   if((type==='task'||type==='todo')&&txtVal.length>500){toast('内容过长（最多500字）');return}
-  let newItem={id,createdAt:today()};
+  let newItem={id,createdAt:today(),updatedAt:Date.now()};
   if(editingId){const old=m.items.find(x=>x.id===editingId);if(old)Object.assign(newItem,old)}
   const att=getAttach();const hwImg=inputMode==='handwrite'?getHwImage():null;
   if(att.attachment!==null){newItem.attachment=att.attachment;newItem.attType=att.attType;if(att.attType==='img')newItem.img=att.attachment}else if(!editingId){newItem.attachment=null;newItem.attType=null;newItem.img=null}
