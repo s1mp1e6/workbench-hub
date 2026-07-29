@@ -1468,6 +1468,16 @@ function closeHwOverlay(){
 /* 保存 */
 function saveItemForm(){
   const m=state.modules[currentMod];const type=m.type;const id=editingId||uid();
+  // 输入校验
+  const titleVal=val('f_title');const txtVal=val('f_txt');const nameVal=val('f_name');const contVal=val('f_content');
+  if((type==='task'||type==='todo')&&!txtVal){toast('请输入内容');return}
+  if(type==='paper'&&!titleVal&&!txtVal){toast('请输入文献标题');return}
+  if(type==='meeting'&&!val('f_title')){toast('请输入会议主题');return}
+  if(type==='experiment'&&!nameVal){toast('请输入实验名称');return}
+  if(type==='book'&&!nameVal){toast('请输入书名');return}
+  if(type==='diary'&&!contVal){toast('请输入日记内容');return}
+  if((type==='note'||type==='paper')&&!contVal){toast('请输入内容');return}
+  if((type==='task'||type==='todo')&&txtVal.length>500){toast('内容过长（最多500字）');return}
   let newItem={id,createdAt:today()};
   if(editingId){const old=m.items.find(x=>x.id===editingId);if(old)Object.assign(newItem,old)}
   const att=getAttach();const hwImg=inputMode==='handwrite'?getHwImage():null;
@@ -1669,7 +1679,9 @@ function init(){renderNav();renderContent();updateClock();setInterval(updateCloc
   // 自动检查更新（后台静默，不打扰用户）
   setTimeout(()=>{fetch('https://raw.githubusercontent.com/'+APP_REPO+'/gh-pages/version.json?_t='+Date.now()).then(r=>r.json()).then(v=>{if(v.version>APP_VERSION&&!sessionStorage.getItem('update_dismissed_'+v.version)){const b=document.createElement('div');b.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:210;background:var(--accent);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px';b.innerHTML='🔄 新版本 v'+v.version+' 可用 <span onclick="location.reload()" style="background:rgba(255,255,255,.2);padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer">刷新</span> <span onclick="this.parentElement.remove();sessionStorage.setItem(\'update_dismissed_'+v.version+'\',\'1\')" style="font-size:16px;cursor:pointer;opacity:.7">×</span>';b.onclick=e=>{if(e.target===b)location.reload()};setTimeout(()=>{document.body.appendChild(b);setTimeout(()=>b.style.opacity='0',10000)},3000)}}).catch(()=>{})},4000);
   // 模态框自动聚焦
-  const maskEl=document.getElementById('mask');new MutationObserver(()=>{if(maskEl.classList.contains('show'))setTimeout(()=>{const inp=maskEl.querySelector('input,textarea');if(inp)inp.focus()},120)}).observe(maskEl,{attributes:true,attributeFilter:['class']});
+  const maskEl=document.getElementById('mask');new MutationObserver(()=>{if(maskEl.classList.contains('show')){setTimeout(()=>{const inp=maskEl.querySelector('input,textarea');if(inp)inp.focus()},120)}}).observe(maskEl,{attributes:true,attributeFilter:['class']});
+  // 键盘焦点锁定
+  document.addEventListener('keydown',function ke(e){if(e.key==='Tab'&&document.getElementById('mask').classList.contains('show')){const f=document.querySelectorAll('#modalBody input,#modalBody textarea,#modalBody select,#modalBody button:not(.x)');if(f.length){if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f[f.length-1].focus()}else if(!e.shiftKey&&document.activeElement===f[f.length-1]){e.preventDefault();f[0].focus()}}}});
   // 全局快捷键
   let gKey=false;
   document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
