@@ -969,7 +969,7 @@ function attachLink(item){
   if(item.attType==='doc'&&item.attachment){return `<div class="tl-attach" onclick="viewImgSrc('${item.attachment.replace(/'/g,"\\'")}')">📄 文档附件</div>`}
   return '';
 }
-function delLog(lid){if(!confirm('确定删除这条记录？'))return;const el=document.querySelector('[data-lid="'+lid+'"]');if(el){el.classList.add('fade-out');setTimeout(()=>{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);save();renderContent();renderNav();toast('已删除')}},200)}else{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);save();renderContent();renderNav();toast('已删除')}}}
+function delLog(lid){if(!confirm('确定删除这条记录？'))return;const el=document.querySelector('[data-lid="'+lid+'"]');if(el){el.classList.add('fade-out');setTimeout(()=>{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);item.updatedAt=Date.now();save();renderContent();renderNav();toast('已删除')}},200)}else{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);item.updatedAt=Date.now();save();renderContent();renderNav();toast('已删除')}}}
 function recalcSummary(item,type){if(type==='experiment'){const latest=item.logs&&item.logs.length?item.logs.reduce((a,b)=>(a.date||'')>(b.date||'')?a:b):null;item.progress=latest?latest.progress:0;item.status=item.progress>=100?'已完成':item.progress>0?'进行中':'刚启动'}else{const latest=item.logs&&item.logs.length?item.logs.reduce((a,b)=>(a.date||'')>(b.date||'')?a:b):null;item.page=latest?latest.page:0}}
 
 /* 普通卡片（纵向单列，摘要模式，点击进入详情页）*/
@@ -1455,10 +1455,11 @@ function openHwOverlay(){
     // 重绘
     hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;ctx.lineCap='round';ctx.lineJoin='round';s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();});
     const getP=e=>{const r=cvs.getBoundingClientRect();if(e.touches){const t=e.touches[0];return{x:t.clientX-r.left,y:t.clientY-r.top}}return{x:e.clientX-r.left,y:e.clientY-r.top}};
-    let curPath=[];
-    const start=e=>{e.preventDefault();hwState.isDrawing=true;const p=getP(e);curPath=[p];ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle=hwState.color;ctx.lineWidth=hwState.width};
-    const move=e=>{e.preventDefault();if(!hwState.isDrawing)return;const p=getP(e);ctx.lineTo(p.x,p.y);ctx.stroke();curPath.push(p)};
-    const end=e=>{e.preventDefault();if(!hwState.isDrawing)return;hwState.isDrawing=false;hwState.data.push({path:[...curPath],color:hwState.color,width:hwState.width})};
+    let curPath=[],fPoints=[],fRaf=false;
+    const flushF=()=>{if(!fPoints.length)return;ctx.beginPath();ctx.strokeStyle=hwState.color;ctx.lineWidth=hwState.width;fPoints.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();fPoints=[];fRaf=false};
+    const start=e=>{e.preventDefault();hwState.isDrawing=true;curPath=[];const p=getP(e);fPoints=[p];curPath.push(p);if(!fRaf){fRaf=true;requestAnimationFrame(flushF)}};
+    const move=e=>{e.preventDefault();if(!hwState.isDrawing)return;const p=getP(e);fPoints.push(p);curPath.push(p);if(!fRaf){fRaf=true;requestAnimationFrame(flushF)}};
+    const end=e=>{e.preventDefault();if(!hwState.isDrawing)return;hwState.isDrawing=false;fRaf&&flushF();curPath.length&&hwState.data.push({path:[...curPath],color:hwState.color,width:hwState.width})};
     cvs.onmousedown=start;cvs.onmousemove=move;cvs.onmouseup=end;
     cvs.ontouchstart=start;cvs.ontouchmove=move;cvs.ontouchend=end;
   },100);
@@ -1513,7 +1514,7 @@ function saveLogForm(){
   if(type==='experiment'){Object.assign(newLog,{date:val('f_date')||today(),progress:Math.min(100,Math.max(0,+val('f_progress')||0)),note:val('f_note')})}
   else if(type==='book'){Object.assign(newLog,{date:val('f_date')||today(),page:+val('f_page')||0,feeling:val('f_feeling'),note:val('f_note')})}
   if(editingId){const idx=(parent.logs||[]).findIndex(x=>x.id===editingId);if(idx>=0)parent.logs[idx]=newLog}else{(parent.logs=parent.logs||[]).push(newLog)}save();
-  recalcSummary(parent,type);pendingAttach=null;closeModal();renderContent();renderNav();toast(editingId?'已更新':'已添加');
+  recalcSummary(parent,type);parent.updatedAt=Date.now();pendingAttach=null;closeModal();renderContent();renderNav();toast(editingId?'已更新':'已添加');
 }
 function closeModal(){document.getElementById('mask').classList.remove('show');editingId=null;pendingAttach=null;pendingAttachType=null;hwState.color='#37352f';hwState.width=3;hwState.isDrawing=false;hwState.currentPath=[];hwHeight=220;}
 document.getElementById('mask').addEventListener('click',e=>{if(e.target.id==='mask')closeModal()});
@@ -1550,7 +1551,7 @@ function updateClock(){const d=new Date();const h=String(d.getHours()).padStart(
 /* 导入导出/重置 */
 let _markedLoaded=false;
 function loadMarked(){if(_markedLoaded)return Promise.resolve();_markedLoaded=true;return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/marked@15/marked.min.js';s.onload=res;s.onerror=()=>{_markedLoaded=false;rej()};document.head.appendChild(s)})}
-function md2html(text){if(!text)return'';try{if(typeof marked!=='undefined'){let html=marked.parse(text);return html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<[^>]*\son\w+\s*=[\s\S]*?>/gi,'').replace(/javascript:/gi,'')}return esc(text)}catch(e){return esc(text)}}
+function md2html(text){if(!text)return'';try{if(typeof marked!=='undefined'){const doc=new DOMParser().parseFromString(marked.parse(text),'text/html');doc.querySelectorAll('script,iframe,object,embed,style').forEach(e=>e.remove());doc.querySelectorAll('*').forEach(e=>{Array.from(e.attributes).forEach(a=>{if(a.name.startsWith('on')||a.value.replace(/\s+/g,'').toLowerCase().includes('javascript:'))e.removeAttribute(a.name)})});return doc.body.innerHTML}return esc(text)}catch(e){return esc(text)}}
 function resetToday(){document.getElementById('modalTitle').textContent='↻ 重置内容';
   const modules=[];['todos','tasks','experiments','diary'].forEach(mid=>{const m=state.modules[mid];if(m&&m.items&&m.items.length)modules.push(mid)});
   if(!modules.length){toast('没有可重置的内容');return}
@@ -1633,8 +1634,8 @@ function gistSave(){const el=document.getElementById('s_gistStatus');if(!el)retu
 function gistLoad(){const el=document.getElementById('s_gistStatus');if(!el)return;const id=localStorage.getItem('ph_gist_id');if(!id){el.textContent='❌ 无 Gist ID';return}el.textContent='⏳ 下载中...';gistApi('/gists/'+id,'GET').then(r=>{if(r&&r.files&&r.files['hub-data.json']){const c=JSON.parse(r.files['hub-data.json'].content);if(c&&c.modules){state=mergeState(state,c);save();renderNav();renderContent();el.textContent='✅ 已合并同步'}else el.textContent='❌ 数据格式错误'}else el.textContent='❌ 未找到数据'}).catch(e=>{el.textContent='❌ '+e.message})}
 function mergeState(local,remote){const merged={...local};merged.modules={...local.modules};
   Object.keys(remote.modules||{}).forEach(mid=>{const rm=remote.modules[mid];if(!merged.modules[mid]){merged.modules[mid]=rm;return}
-    const lm=merged.modules[mid];const items=lm.items||[];const rItems=rm.items||[];const map=new Map();items.forEach(item=>{item.updatedAt=item.updatedAt||0;map.set(item.id,item)});
-    rItems.forEach(ri=>{ri.updatedAt=ri.updatedAt||0;const li=map.get(ri.id);if(!li||(ri.updatedAt>li.updatedAt))map.set(ri.id,ri)});
+    const lm=merged.modules[mid];const items=lm.items||[];const rItems=rm.items||[];const map=new Map();items.forEach(item=>{item.updatedAt=item.updatedAt||0;if(!item.isDeleted)map.set(item.id,item)});
+    rItems.forEach(ri=>{ri.updatedAt=ri.updatedAt||0;const li=map.get(ri.id);if(li){if(ri.updatedAt>li.updatedAt&&!ri.isDeleted)map.set(ri.id,ri)}else if(!ri.isDeleted)map.set(ri.id,ri)});
     merged.modules[mid].items=Array.from(map.values());merged.modules[mid].items.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   });
   merged.moduleOrder=merged.moduleOrder.filter(mid=>merged.modules[mid]);remote.moduleOrder.forEach(mid=>{if(!merged.moduleOrder.includes(mid))merged.moduleOrder.push(mid)});
@@ -1666,6 +1667,7 @@ function hotspotSend(){showShareModal(JSON.stringify(state).length)}
 let batchMode=false,batchSelected=[];
 document.addEventListener('click',e=>{if(batchMode){const card=e.target.closest('.card');if(card){const id=card.dataset.id;if(id){const idx=batchSelected.indexOf(id);if(idx>=0)batchSelected.splice(idx,1);else batchSelected.push(id);card.classList.toggle('batch-sel',idx<0);toast('已选 '+batchSelected.length+' 项')}}}});
 function toggleBatchMode(){batchMode=!batchMode;if(!batchMode){batchSelected=[];document.querySelectorAll('.card.batch-sel').forEach(c=>c.classList.remove('batch-sel'))}document.querySelectorAll('.card').forEach(c=>c.classList.toggle('batch-mode',batchMode));toast(batchMode?'🔲 点击卡片选择 | d=删除选中 | Esc=退出':'')}
+function batchDelete(){if(!batchSelected.length){toast('未选择任何项');return}const m=state.modules[currentMod];if(!m||!m.items)return;m.items.forEach(it=>{if(batchSelected.includes(it.id)){it.isDeleted=true;it.updatedAt=Date.now()}});const n=batchSelected.length;batchSelected=[];batchMode=false;save();renderContent();renderNav();toast('已删除 '+n+' 项')}
 function migrateStorage(){const to=_useIDB?'IndexedDB':'localStorage';const from=_useIDB?'localStorage':'IndexedDB';if(!confirm(`将数据从 ${from} 迁移到 ${to}？将覆盖目标中的现有数据。确定？`))return;const p=_useIDB?Promise.resolve(localStorage.setItem(KEY,JSON.stringify(state))).then(()=>_idb.remove(KEY)):_idb.set(KEY,JSON.stringify(state)).then(()=>localStorage.removeItem(KEY));p.then(()=>toast('数据已迁移到 '+to)).catch(e=>toast('迁移失败：'+e.message))}
 async function pickExportFile(){const canFA=!!window.showSaveFilePicker;if(canFA){try{_customFileHandle=await window.showSaveFilePicker({suggestedName:'workbench_backup.json',types:[{description:'JSON Backup',accept:{'application/json':['.json']}}]});localStorage.setItem('ph_file_handle',JSON.stringify({name:_customFileHandle.name}));toast('✅ 已选择备份文件');openSettings()}catch(e){}}else{exportData()}}
 // 初始化存储后端
