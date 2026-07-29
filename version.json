@@ -1,1 +1,1 @@
-{"version":"1.0.8","notes":"8 fixes: handwriting coord sync, md2html XSS hardening, batchDelete undo+detailId, mergeState moduleOrder filter, viewImgSrc lightbox, saveUnifiedEdit type guard, gistApi abort timeout, init MutationObserver singleton"}
+{"version":"1.0.9","notes":"8 fixes: viewImgSrc DOM XSS+scroll lock, checkUpdate SW cache-bust, hwOverlay z-index+safe-t, doExport soft-delete filter, resize handwriting rotate, renderCalendar ISO regex, lpMenu backdrop, saveUnifiedEdit tags guard"}

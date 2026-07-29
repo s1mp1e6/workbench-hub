@@ -421,7 +421,7 @@
   .hw-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;display:none;align-items:center;justify-content:center;padding:20px}
   .hw-overlay.show{display:flex}
   .hw-overlay .hw-panel{background:#fffef5;border-radius:14px;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
-  .hw-overlay .hw-panel .hw-top{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:#fff;flex-shrink:0;flex-wrap:wrap}
+  .hw-overlay .hw-panel .hw-top{padding-top:calc(12px + var(--safe-t));padding-left:calc(16px + var(--safe-l));padding-right:calc(16px + var(--safe-r));padding-bottom:12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:#fff;flex-shrink:0;flex-wrap:wrap}
   .hw-overlay .hw-panel .hw-canvas-wrap{flex:1;position:relative;overflow:hidden}
   .handwrite-area{position:relative;border:2px dashed var(--line-strong);border-radius:10px;background:#fffef5;cursor:crosshair;overflow:hidden;transition:height .25s}
   .handwrite-area canvas{display:block;width:100%;height:100%;touch-action:none}
@@ -1168,16 +1168,18 @@ function bindLp(el,getCtx,opts={}){
 /* 长按菜单 */
 function showLpMenu(e,rect,ctx){
   lpContext=ctx;
+  let backdrop=document.getElementById('lpBackdrop');
+  if(!backdrop){backdrop=document.createElement('div');backdrop.id='lpBackdrop';backdrop.style.cssText='position:fixed;inset:0;z-index:115;background:transparent;touch-action:none';backdrop.ontouchstart=hideLpMenu;document.body.appendChild(backdrop)}
+  backdrop.style.display='block';
   const menu=document.getElementById('lpMenu');
   let x=rect.left,y=rect.bottom+6;
-  if(e.touches){x=e.touches[0].clientX;y=e.touches[0].clientY+10}
-  // 防止超出屏幕
+  if(e.touches&&e.touches[0]){x=e.touches[0].clientX;y=e.touches[0].clientY+10}
   if(x+160>window.innerWidth)x=window.innerWidth-170;
   if(y+240>window.innerHeight)y=rect.top-240;
-  menu.style.left=x+'px';menu.style.top=y+'px';
+  menu.style.left=Math.max(10,x)+'px';menu.style.top=Math.max(10,y)+'px';
   menu.classList.add('show');
 }
-function hideLpMenu(){document.getElementById('lpMenu').classList.remove('show');lpContext=null}
+function hideLpMenu(){document.getElementById('lpMenu').classList.remove('show');const bd=document.getElementById('lpBackdrop');if(bd)bd.style.display='none';lpContext=null}
 document.addEventListener('click',e=>{if(!e.target.closest('.lp-menu')&&!e.target.closest('.card')&&!e.target.closest('.dash-widget'))hideLpMenu()});
 function lpAction(action){
   if(!lpContext){hideLpMenu();return}
@@ -1472,7 +1474,7 @@ function openModuleModal(){
 }
 function saveModule(){const name=val('m_name');if(!name){toast('请填写模块名称');return}const iconEl=document.querySelector('input[name="micon"]:checked');const mid='custom_'+uid();state.modules[mid]={name,icon:iconEl?iconEl.value:'📝',color:val('m_color'),type:val('m_type'),custom:true,items:[]};state.moduleOrder.push(mid);save();renderNav();closeModal();switchMod(mid);toast('模块已创建');}
 
-function viewImgSrc(src){let box=document.getElementById('imgLightbox');if(!box){box=document.createElement('div');box.id='imgLightbox';box.style.cssText='position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';box.onclick=()=>box.style.display='none';document.body.appendChild(box)}box.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5)">';box.style.display='flex'}
+function viewImgSrc(src){let box=document.getElementById('imgLightbox');if(!box){box=document.createElement('div');box.id='imgLightbox';box.style.cssText='position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out;touch-action:none';box.onclick=()=>box.style.display='none';const img=document.createElement('img');img.style.cssText='max-width:100%;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5)';box.appendChild(img);document.body.appendChild(box)}box.querySelector('img').src=src;box.style.display='flex'}
 
 /* 激励语（含名著搜索）*/
 function nextQuote(){state.activeQuote=(state.activeQuote+1)%state.customQuotes.length;save();renderContent()}
@@ -1520,8 +1522,8 @@ function renderCalendar(m){
   const now=new Date();const month=_calMonth,year=_calYear;const dim=new Date(year,month+1,0).getDate();
   const fd=new Date(year,month,1).getDay();const wk='日一二三四五六'.split('');
   const dated=[];['diary','tasks','todos'].forEach(mid=>{const mod=state.modules[mid];if(!mod)return;getActiveItems(mod).forEach(it=>{
-    const d=it.date||it.due||it.createdAt||'';
-    if(d){const p=d.split('-');if(p.length===3&&+p[0]===year&&+p[1]===month+1)dated.push({day:+p[2],title:it.txt||it.title||'(无标题)',icon:mod.icon,id:it.id})}})});
+    const dStr=it.date||it.due||it.createdAt||'';
+    if(dStr){const match=dStr.match(/^(\d{4})-(\d{2})-(\d{2})/);if(match&&+match[1]===year&&+match[2]===month+1)dated.push({day:+match[3],title:it.txt||it.title||'(无标题)',icon:mod.icon,id:it.id})}})});
   const days=[];for(let i=0;i<fd;i++)days.push(0);for(let i=1;i<=dim;i++)days.push(i);
   let h=`<div class="cal"><div class="cal-head"><button onclick="_calMonth--;if(_calMonth<0){_calMonth=11;_calYear--};renderContent()">‹</button><h3>${year}年${month+1}月</h3><button onclick="_calMonth++;if(_calMonth>11){_calMonth=0;_calYear++};renderContent()">›</button></div><div class="cal-grid">${wk.map(w=>`<div class="cal-wday">${w}</div>`).join('')}`;
   days.forEach(d=>{if(d===0){h+='<div class="cal-cell other"></div>';return}
@@ -1582,7 +1584,8 @@ function mergeState(local,remote){const merged={...local};merged.modules={...loc
   return merged}
 function touch(id){const m=state.modules[currentMod];if(!m||!m.items)return;const item=m.items.find(x=>x.id===id);if(item)item.updatedAt=Date.now()}
 function gistFind(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 查找中...';gistApi('/gists?per_page=50','GET').then(list=>{const match=list.find(g=>g.files&&g.files['hub-data.json']);if(match){localStorage.setItem('ph_gist_id',match.id);el.textContent='✅ 找到备份 Gist：'+match.id;toast('✅ 找到备份，正在下载...');gistLoad()}else{el.textContent='❌ 未找到备份 Gist，请先在其他设备上传'}}).catch(e=>{el.textContent='❌ '+e.message})}
-function checkUpdate(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 检查更新...';fetch('https://raw.githubusercontent.com/'+APP_REPO+'/gh-pages/version.json?_t='+Date.now()).then(r=>r.json()).then(v=>{if(v.version>APP_VERSION){el.innerHTML='✅ 发现新版本 v'+v.version+'（当前 v'+APP_VERSION+'）<br><a href="https://github.com/'+APP_REPO+'/releases/latest" target="_blank" style="color:var(--accent)">下载 APK</a> | <span onclick="location.reload()" style="color:var(--accent);cursor:pointer">🔄 刷新此页面</span>';toast('🔄 新版本 v'+v.version+' 可用')}else{el.textContent='✅ 已是最新版 v'+APP_VERSION;toast('✅ 已是最新版')}}).catch(e=>{el.textContent='❌ 检查失败：'+e.message})}
+function checkUpdate(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 检查更新...';fetch('https://raw.githubusercontent.com/'+APP_REPO+'/gh-pages/version.json?_t='+Date.now()).then(r=>r.json()).then(v=>{if(v.version>APP_VERSION){el.innerHTML='✅ 发现新版本 v'+v.version+'（当前 v'+APP_VERSION+'）<br><a href="https://github.com/'+APP_REPO+'/releases/latest" target="_blank" style="color:var(--accent)">下载 APK</a> | <span onclick="forceAppReload()" style="color:var(--accent);cursor:pointer;font-weight:600">🔄 强制清除缓存并刷新</span>';toast('🔄 新版本 v'+v.version+' 可用')}else{el.textContent='✅ 已是最新版 v'+APP_VERSION;toast('✅ 已是最新版')}}).catch(e=>{el.textContent='❌ 检查失败：'+e.message})}
+function forceAppReload(){if('serviceWorker' in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.getRegistrations().then(regs=>{for(let reg of regs)reg.unregister();window.location.reload(true)})}else{window.location.reload(true)}}
 /* QR 码局域网同步 */
 function qrSend(){showShareModal()}
 function showShareModal(){
@@ -1595,7 +1598,7 @@ function showShareModal(){
   document.getElementById('modalFoot').innerHTML='<span id="modeHint" style="font-size:11px;color:var(--ink-faint)"></span><span style="display:flex;gap:8px"><button class="btn ghost" onclick="document.querySelectorAll(\'.expMod\').forEach(e=>e.checked=false);closeModal()">取消</button><button class="btn primary" onclick="doExport()">⬇️ 导出</button></span>'
 }
 function doExport(){const sel=[];document.querySelectorAll('.expMod:checked').forEach(e=>sel.push(e.value));if(!sel.length){toast('请至少选择一个模块');return}
-  const out=JSON.parse(JSON.stringify(state));Object.keys(out.modules).forEach(k=>{if(!sel.includes(k)&&k!=='dashboard')delete out.modules[k]});
+  const out=JSON.parse(JSON.stringify(state));Object.keys(out.modules).forEach(k=>{if(!sel.includes(k)&&k!=='dashboard')delete out.modules[k];else if(out.modules[k]&&out.modules[k].items)out.modules[k].items=out.modules[k].items.filter(it=>!it.isDeleted)});
   out.moduleOrder=['dashboard',...sel];
   if(sel.length<state.moduleOrder.length-1){delete out.dashWidgets}
   const json=JSON.stringify(out,null,2);const blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();
@@ -1634,7 +1637,7 @@ document.getElementById('searchInput').addEventListener('input',debounce(perform
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Escape')closeSearch();if(e.key==='Enter'){const first=document.querySelector('.sr-item');if(first)first.click()}});
 
 let _maskObserver=null;
-function init(){renderNav();renderContent();updateClock();setInterval(updateClock,1000);updateStorageInfo();window.addEventListener('resize',debounce(()=>{if(document.querySelector('.mask.show'))resizeHandwrite();},200));
+function init(){renderNav();renderContent();updateClock();setInterval(updateClock,1000);updateStorageInfo();window.addEventListener('resize',debounce(()=>{if(document.querySelector('.mask.show'))resizeHandwrite();if(document.getElementById('hwOverlay').classList.contains('show')){const cvs=document.getElementById('hwCanvasF');const wrap=cvs?cvs.parentElement:null;if(cvs&&wrap&&(cvs.width!==wrap.clientWidth||cvs.height!==wrap.clientHeight)){cvs.width=wrap.clientWidth;cvs.height=wrap.clientHeight;const ctx=cvs.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke()})}}},200));
   // 生成 PNG 图标（SVG 降级方案）
   setTimeout(()=>{if(!document.querySelector('link[rel=\"icon\"][type=\"image/png\"]')){const c=document.createElement('canvas');c.width=64;c.height=64;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,64,64);g.addColorStop(0,'#2383e2');g.addColorStop(.5,'#6940a5');g.addColorStop(1,'#d9730d');x.fillStyle=g;x.beginPath();x.roundRect(8,8,48,48,10);x.fill();x.fillStyle='#fff';x.font='30px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('✦',32,34);const url=c.toDataURL('image/png');const link=document.createElement('link');link.rel='icon';link.type='image/png';link.href=url;document.head.appendChild(link)}},500);
   // 异步加载 IndexedDB 数据（如果设置了）
