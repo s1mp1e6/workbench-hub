@@ -680,7 +680,7 @@ function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();deferred
 window.onerror=function(msg,url,line){console.error(msg,url,line);try{document.getElementById('toast')&&toast('⚠️ 页面出现错误，部分功能可能不可用')}catch(e){}};
 window.addEventListener('unhandledrejection',function(e){console.error(e.reason);try{document.getElementById('toast')&&toast('⚠️ 操作失败：'+e.reason.message)}catch(ex){}});
 const KEY='personal_hub_v6';
-const APP_VERSION='1.0.3';
+const APP_VERSION='1.0.4';
 const APP_REPO='s1mp1e6/workbench-hub';
 let state=load();
 let _dashClockEl=null,_dashDateEl=null,_dashGreetEl=null;
@@ -1444,6 +1444,7 @@ function resizeHandwrite(){const cvs=document.getElementById('hwCanvas');const b
 function getHwImage(){const cvs=document.getElementById('hwCanvas');if(!cvs)return null;const ctx=cvs.getContext('2d');const data=ctx.getImageData(0,0,cvs.width,cvs.height).data;let blank=true;for(let i=3;i<data.length;i+=4){if(data[i]!==0){blank=false;break}}if(blank)return null;return cvs.toDataURL('image/png');}
 
 /* 全屏手写 */
+function getCanvasBg(){return document.documentElement.classList.contains('dark')?'#2e2e32':'#fffef5'}
 function openHwOverlay(){
   // 先把当前小画板的数据同步
   const smallCvs=document.getElementById('hwCanvas');
