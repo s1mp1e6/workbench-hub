@@ -864,7 +864,7 @@ function updateAddButton(){
 
 /* 首页桌面 */
 function renderDashboard(){
-  const todos=state.modules.todos,tasks=state.modules.tasks,books=state.modules.books,exps=state.modules.experiments,diary=state.modules.diary;
+  const todos=getActiveItems('todos'),tasks=getActiveItems('tasks'),books=getActiveItems('books'),exps=getActiveItems('experiments'),diary=getActiveItems('diary');
   let stats=[];
   if(todos){const d=todos.items.filter(x=>x.done).length;stats.push({num:`${d}/${todos.items.length}`,lbl:'今日待办'})}
   if(tasks){const d=tasks.items.filter(x=>x.done).length;stats.push({num:`${d}/${tasks.items.length}`,lbl:'近期任务'})}
