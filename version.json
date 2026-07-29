@@ -1,1 +1,1 @@
-{"version":"1.0.7","notes":"8 fixes: closeHwOverlay coord copy, saveUnifiedEdit date mapping, exportData TextEncoder, delLog async closure, keyboard select intercept, gistTest empty token, performSearch dataset delegate, doExport privacy filter"}
+{"version":"1.0.8","notes":"8 fixes: handwriting coord sync, md2html XSS hardening, batchDelete undo+detailId, mergeState moduleOrder filter, viewImgSrc lightbox, saveUnifiedEdit type guard, gistApi abort timeout, init MutationObserver singleton"}
