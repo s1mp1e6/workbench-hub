@@ -1,1 +1,1 @@
-{"version":"1.0.5","notes":"12 fixes: soft-delete chain (delItem+delListItem+resetToday), mergeState tombstone+moduleOrder, dashboard stats, saveUnifiedEdit empty-value, handwriting dark-bg, editLog missing fn, toggleItem status, calendar soft-delete filter, closeModal canvas pollution, saveItemForm isDeleted init"}
+{"version":"1.0.6","notes":"8 fixes: toggleItem scope, saveItemForm paper validation, metaFields DOM ID conflict, importData merge confirm, mergeState widgets/quotes sync, recalcSummary date sort, search nav stack, handwriting coordinate scaling"}
