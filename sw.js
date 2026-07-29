@@ -22,9 +22,27 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: Cache-First for assets, Network-First for API
+// Fetch: Network-First for HTML, Cache-First for assets, Network-Only for API
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // HTML pages → Network-First (always check for updates)
+  if (e.request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html')) {
+    e.respondWith(
+      fetch(e.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        return response;
+      }).catch(() => caches.match(e.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // version.json → Network-First, no cache
+  if (url.pathname === '/version.json') {
+    e.respondWith(fetch(e.request).catch(() => new Response(JSON.stringify({version:'0.0.0'}), {headers:{'Content-Type':'application/json'}})));
+    return;
+  }
 
   // API calls to github.com → network-only
   if (url.hostname === 'api.github.com') {
