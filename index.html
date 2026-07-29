@@ -866,17 +866,17 @@ function updateAddButton(){
 function renderDashboard(){
   const todos=getActiveItems('todos'),tasks=getActiveItems('tasks'),books=getActiveItems('books'),exps=getActiveItems('experiments'),diary=getActiveItems('diary');
   let stats=[];
-  if(todos){const d=todos.items.filter(x=>x.done).length;stats.push({num:`${d}/${todos.items.length}`,lbl:'今日待办'})}
-  if(tasks){const d=tasks.items.filter(x=>x.done).length;stats.push({num:`${d}/${tasks.items.length}`,lbl:'近期任务'})}
-  if(exps){const r=exps.items.filter(x=>x.status==='进行中').length;stats.push({num:r,lbl:'进行中实验'})}
-  if(books){const t=books.items.reduce((s,b)=>s+(b.page||0),0);stats.push({num:t,lbl:'已读页数'})}
+  if(state.modules.todos){const d=todos.filter(x=>x.done).length;stats.push({num:`${d}/${todos.length}`,lbl:'今日待办'})}
+  if(state.modules.tasks){const d=tasks.filter(x=>x.done).length;stats.push({num:`${d}/${tasks.length}`,lbl:'近期任务'})}
+  if(state.modules.experiments){const r=exps.filter(x=>x.status==='进行中').length;stats.push({num:r,lbl:'进行中实验'})}
+  if(state.modules.books){const t=books.reduce((s,b)=>s+(b.page||0),0);stats.push({num:t,lbl:'已读页数'})}
   const q=state.customQuotes[state.activeQuote]||state.customQuotes[0];
-  const latestDiary=diary&&diary.items.length?diary.items[0]:null;
+  const latestDiary=diary.length?diary[0]:null;
   const widgets=(state.dashWidgets||[]).map(w=>renderWidget(w)).join('');
   return `<div class="dashboard">
     <div class="dash-hero"><div class="dash-clock" id="dashClock">--:--<span class="sec">:--</span></div><div class="dash-date" id="dashDate"></div><div class="dash-greet" id="dashGreet"></div></div>
     <div class="dash-row">
-      <div class="quote-card" data-lp="quote" onclick="nextQuote()" title="点击换一句"><div class="qh"><span>💬 每日激励</span><span class="edit" onclick="event.stopPropagation();openQuoteModal()">✎ 管理</span></div><div class="qt">${q?esc(q.text):'点击右上角添加你的激励语'}</div><div class="qa">${q?'— '+(esc(q.author)||'佚名'):''}</div></div>
+      <div class="quote-card" data-lp="quote" onclick="nextQuote()" title="点击换一句"><div class="qh"><span>💬 每日激励</span><span class="edit" onclick="event.stopPropagation();openQuoteModal()">✎ 管理</span></div><div class="qt">${q?esc(q.text):'点击右上角添加激励语'}</div><div class="qa">${q?'— '+(esc(q.author)||'佚名'):''}</div></div>
       <div class="stat-card" data-lp="stats"><h4>📊 今日概览</h4><div class="stat-grid">${stats.map(s=>`<div class="stat-item"><span class="num">${s.num}</span><span class="lbl">${s.lbl}</span></div>`).join('')}</div></div>
     </div>
     <div class="dash-widgets" id="dashWidgets">${widgets}</div>
@@ -926,7 +926,7 @@ function renderListCard(item,type){
   return `<div class="card" data-id="${item.id}" draggable="true"><button class="cdel" onclick="event.stopPropagation();delListItem('${item.id.replace(/'/g,"\\'")}')">🗑</button><div class="drag-handle" title="拖拽调换顺序">⠿</div><div class="cbody" onclick="openDetail('${item.id.replace(/'/g,"\\'")}')" style="display:flex;gap:12px;align-items:center"><div style="width:46px;height:62px;border-radius:5px;flex-shrink:0;background:linear-gradient(135deg,${color});color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;text-align:center;padding:3px;line-height:1.2;box-shadow:0 2px 6px rgba(0,0,0,.15)">${esc((item.name||'').slice(0,4))}</div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:15px">${esc(item.name)}</div><div style="font-size:11px;color:var(--ink-faint);margin-bottom:6px">${esc(item.author)} · ${item.page||0}/${item.total||0} 页</div><div class="tl-bar"><i style="width:${pct}%;background:var(--accent)"></i></div></div></div><div class="cside"><div class="cside-date">${esc(startDate.slice(5))||'-'}</div><div class="cside-sub">开始 ${esc(startDate.slice(0,4))||''}</div><div class="cside-sub" style="margin-top:4px">${pct}%</div></div></div>`;
 }
 function openDetail(id){_historyStack.push({mod:currentMod,detail:detailId});_savedScrollY=window.scrollY||document.querySelector('.content').scrollTop||0;detailId=id;renderContent()}
-function delListItem(id){const card=document.querySelector('.card[data-id="'+id+'"]');const m=state.modules[currentMod];const idx=m.items.findIndex(x=>x.id===id);if(idx<0)return;const saved={...m.items[idx]};if(card)card.classList.add('fade-out');toastUndo('🗑 已删除（含所有时间轴记录）',()=>{m.items.splice(idx,0,saved);save();renderContent();renderNav();toast('已恢复')});setTimeout(()=>{m.items=m.items.filter(x=>x.id!==id);if(detailId===id)detailId=null;save();renderContent();renderNav()},250)}
+function delListItem(id){delItem(id);}
 
 /* 时间轴详情（显示开始日期）*/
 function renderTimelineDetail(m){
@@ -1278,53 +1278,40 @@ function metaFields(type,item){
 function saveUnifiedEdit(){
   const m=state.modules[currentMod];const type=m.type;const id=editingId;const item=m.items.find(x=>x.id===id);if(!item)return;
   item.updatedAt=Date.now();
-  // 先保存内容表单（复用已有字段逻辑）
-  if(type==='task'){
-    const txt=val('f_txt');if(txt)item.txt=txt;
-    item.status=val('f_status')||item.status;item.priority=val('f_priority')||item.priority;item.due=val('f_due')||item.due;item.done=(val('f_status')||item.status)==='done';
-  }else if(type==='todo'){
-    const txt=val('f_txt');if(txt)item.txt=txt;
-    item.priority=val('f_priority');
-  }else if(type==='paper'){
-    const title=val('f_title');if(title)item.title=title;
-    item.info=val('f_info');item.summary=val('f_summary');item.tags=val('f_tags').split(',').map(s=>s.trim()).filter(Boolean);
-  }else if(type==='meeting'){
-    const title=val('f_title');if(title)item.title=title;
-    item.date=val('f_date')||today();item.points=val('f_points').split('\n').map(s=>s.trim()).filter(Boolean);
-  }else if(type==='diary'){
-    item.date=val('f_date')||today();
-    const moodEmoji=(document.querySelector('input[name="mood"]:checked')||{}).value||'';
-    const moodText=val('f_mood_text');item.mood=moodEmoji+(moodText?' '+moodText:'');
-    item.title=val('f_title');item.content=val('f_content');
-  }else if(type==='note'){
-    const sc=document.querySelector('input[name="scolor"]:checked');item.title=val('f_title');item.content=val('f_content');item.style=val('f_style');item.stickyColor=val('f_style')==='sticky'?(sc?sc.value:null):null;
-  }else if(type==='experiment'){
-    const name=val('f_name');if(name)item.name=name;
-    item.startDate=val('f_startDate')||today();
-  }else if(type==='book'){
-    const name=val('f_name');if(name)item.name=name;
-    item.author=val('f_author');item.total=+val('f_total')||0;item.startDate=val('f_startDate')||today();
-  }
-  // 附件与手写
+  if(document.getElementById('f_txt'))item.txt=val('f_txt');
+  else if(document.getElementById('meta_txt'))item.txt=val('meta_txt');
+  if(document.getElementById('f_status'))item.status=val('f_status');
+  else if(document.getElementById('meta_status'))item.status=val('meta_status');
+  if(document.getElementById('f_priority'))item.priority=val('f_priority');
+  else if(document.getElementById('meta_priority'))item.priority=val('meta_priority');
+  if(document.getElementById('f_due'))item.due=val('f_due');
+  else if(document.getElementById('meta_due'))item.due=val('meta_due');
+  if(document.getElementById('f_title'))item.title=val('f_title');
+  else if(document.getElementById('meta_title'))item.title=val('meta_title');
+  if(document.getElementById('f_info'))item.info=val('f_info');
+  else if(document.getElementById('meta_info'))item.info=val('meta_info');
+  if(document.getElementById('f_summary'))item.summary=val('f_summary');
+  if(document.getElementById('f_tags'))item.tags=val('f_tags').split(',').map(s=>s.trim()).filter(Boolean);
+  else if(document.getElementById('meta_tags'))item.tags=val('meta_tags').split(',').map(s=>s.trim()).filter(Boolean);
+  if(document.getElementById('f_date'))item.date=val('f_date');
+  else if(document.getElementById('meta_date'))item.date=val('meta_date');
+  if(document.getElementById('f_content'))item.content=val('f_content');
+  if(document.getElementById('f_name'))item.name=val('f_name');
+  else if(document.getElementById('meta_name'))item.name=val('meta_name');
+  if(document.getElementById('f_author'))item.author=val('f_author');
+  else if(document.getElementById('meta_author'))item.author=val('meta_author');
+  if(document.getElementById('f_total'))item.total=+val('f_total')||0;
+  else if(document.getElementById('meta_total'))item.total=+val('meta_total')||0;
+  if(document.getElementById('meta_createdAt'))item.createdAt=val('meta_createdAt');
+  if(document.getElementById('f_points'))item.points=val('f_points').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(document.getElementById('f_mood_text')){const moodEmoji=(document.querySelector('input[name="mood"]:checked')||{}).value||'';const moodText=val('f_mood_text');item.mood=moodEmoji+(moodText?' '+moodText:'')}
+  if(document.getElementById('f_style')){item.style=val('f_style');const sc=document.querySelector('input[name="scolor"]:checked');item.stickyColor=val('f_style')==='sticky'?(sc?sc.value:null):null}
+  if(document.getElementById('meta_startDate'))item.startDate=val('meta_startDate');
+  else if(document.getElementById('f_startDate'))item.startDate=val('f_startDate');
+  if(type==='task')item.done=item.status==='done';
   const att=getAttach();const hwImg=inputMode==='handwrite'?getHwImage():null;
   if(att.attachment!==null){item.attachment=att.attachment;item.attType=att.attType}
   if(hwImg)item.hwImg=hwImg;
-  // 再保存元信息字段
-  if(document.getElementById('meta_txt'))item.txt=val('meta_txt');
-  if(document.getElementById('meta_status'))item.status=val('meta_status');
-  if(document.getElementById('meta_priority'))item.priority=val('meta_priority');
-  if(document.getElementById('meta_due'))item.due=val('meta_due');
-  if(document.getElementById('meta_title'))item.title=val('meta_title');
-  if(document.getElementById('meta_info'))item.info=val('meta_info');
-  if(document.getElementById('meta_tags'))item.tags=val('meta_tags').split(',').map(s=>s.trim()).filter(Boolean);
-  if(document.getElementById('meta_date'))item.date=val('meta_date');
-  if(document.getElementById('meta_mood'))item.mood=val('meta_mood');
-  if(document.getElementById('meta_name'))item.name=val('meta_name');
-  if(document.getElementById('meta_author'))item.author=val('meta_author');
-  if(document.getElementById('meta_total'))item.total=+val('meta_total')||0;
-  if(document.getElementById('meta_startDate'))item.startDate=val('meta_startDate');
-  if(document.getElementById('meta_createdAt'))item.createdAt=val('meta_createdAt');
-  if(type==='task')item.done=item.status==='done';
   save();closeModal();renderContent();renderNav();toast('已更新');
 }
 
@@ -1453,7 +1440,7 @@ function openHwOverlay(){
   setTimeout(()=>{
     const cvs=document.getElementById('hwCanvasF');const wrap=cvs.parentElement;
     cvs.width=wrap.clientWidth;cvs.height=wrap.clientHeight;
-    const ctx=cvs.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';ctx.fillStyle='#fffef5';ctx.fillRect(0,0,cvs.width,cvs.height);
+    const ctx=cvs.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);
     // 重绘
     hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;ctx.lineCap='round';ctx.lineJoin='round';s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();});
     const getP=e=>{const r=cvs.getBoundingClientRect();if(e.touches){const t=e.touches[0];return{x:t.clientX-r.left,y:t.clientY-r.top}}return{x:e.clientX-r.left,y:e.clientY-r.top}};
@@ -1467,8 +1454,8 @@ function openHwOverlay(){
   },100);
 }
 function setHwColorF(el,c){hwState.color=c;document.querySelectorAll('#hwOverlay .color-dot').forEach(d=>d.classList.remove('active'));el.classList.add('active');}
-function clearHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;const ctx=cvs.getContext('2d');ctx.fillStyle='#fffef5';ctx.fillRect(0,0,cvs.width,cvs.height);hwState.data=[];}
-function undoHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;hwState.data.pop();const ctx=cvs.getContext('2d');ctx.fillStyle='#fffef5';ctx.fillRect(0,0,cvs.width,cvs.height);ctx.lineCap='round';ctx.lineJoin='round';hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();});}
+function clearHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;const ctx=cvs.getContext('2d');ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);hwState.data=[];}
+function undoHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;hwState.data.pop();const ctx=cvs.getContext('2d');ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);ctx.lineCap='round';ctx.lineJoin='round';hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();});}
 function closeHwOverlay(){
   // 把全屏数据同步回小画板
   const bigCvs=document.getElementById('hwCanvasF');
@@ -1554,12 +1541,11 @@ function updateClock(){const d=new Date();const h=String(d.getHours()).padStart(
 let _markedLoaded=false;
 function loadMarked(){if(_markedLoaded)return Promise.resolve();_markedLoaded=true;return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/marked@15/marked.min.js';s.onload=res;s.onerror=()=>{_markedLoaded=false;rej()};document.head.appendChild(s)})}
 function md2html(text){if(!text)return'';try{if(typeof marked!=='undefined'){const doc=new DOMParser().parseFromString(marked.parse(text),'text/html');doc.querySelectorAll('script,iframe,object,embed,style').forEach(e=>e.remove());doc.querySelectorAll('*').forEach(e=>{Array.from(e.attributes).forEach(a=>{if(a.name.startsWith('on')||a.value.replace(/\s+/g,'').toLowerCase().includes('javascript:'))e.removeAttribute(a.name)})});return doc.body.innerHTML}return esc(text)}catch(e){return esc(text)}}
-function resetToday(){document.getElementById('modalTitle').textContent='↻ 重置内容';
-  const modules=[];['todos','tasks','experiments','diary'].forEach(mid=>{const m=state.modules[mid];if(m&&m.items&&m.items.length)modules.push(mid)});
-  if(!modules.length){toast('没有可重置的内容');return}
-  document.getElementById('modalBody').innerHTML='<div style="margin-bottom:12px;color:var(--ink-soft);font-size:13px">选择要清空已完成项/数据的模块：</div>'+modules.map(mid=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="rm_${mid}" checked><span>${esc(state.modules[mid].icon+' '+state.modules[mid].name)}（${state.modules[mid].items.filter(x=>x.done||x.status==='已完成').length} 项已完成）</span></label>`).join('')+'<div style="font-size:11px;color:var(--ink-faint);margin-top:8px">勾选的模块中已完成项将被清空，未完成项保留。</div>';
+function resetToday(){document.getElementById('modalTitle').textContent='↻ 重置完成项';
+  const modules=['todos','tasks','experiments'];
+  document.getElementById('modalBody').innerHTML='<div style="margin-bottom:12px;color:var(--ink-soft);font-size:13px">选择要重置/清空已完成状态的模块：</div>'+modules.map(mid=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="rm_${mid}" checked><span>${esc(state.modules[mid].icon+' '+state.modules[mid].name)}</span></label>`).join('');
   document.getElementById('modeHint').textContent='';
-  document.getElementById('modalSave').onclick=()=>{modules.forEach(mid=>{if(document.getElementById('rm_'+mid)&&document.getElementById('rm_'+mid).checked){const m=state.modules[mid];m.items=m.items.filter(x=>!x.done&&x.status!=='已完成');if(m.type==='experiment')m.items.forEach(item=>{item.logs=(item.logs||[]).filter(l=>l.progress<100);recalcSummary(item,m.type)})}});if(modules.some(mid=>document.getElementById('rm_'+mid)&&document.getElementById('rm_'+mid).checked)){save();closeModal();renderContent();renderNav();toast('已重置勾选项')}else{toast('未选择任何项')}};
+  document.getElementById('modalSave').onclick=()=>{modules.forEach(mid=>{if(document.getElementById('rm_'+mid)&&document.getElementById('rm_'+mid).checked){const m=state.modules[mid];(m.items||[]).forEach(it=>{if(it.done||it.status==='done'||it.status==='已完成'){it.isDeleted=true;it.updatedAt=Date.now()}})}});save();closeModal();renderContent();renderNav();toast('已重置勾选项')};
   document.getElementById('mask').classList.add('show');}
 function exportData(){try{const json=JSON.stringify(state,null,2);
   // Android 原生下载
@@ -1636,11 +1622,11 @@ function gistSave(){const el=document.getElementById('s_gistStatus');if(!el)retu
 function gistLoad(){const el=document.getElementById('s_gistStatus');if(!el)return;const id=localStorage.getItem('ph_gist_id');if(!id){el.textContent='❌ 无 Gist ID';return}el.textContent='⏳ 下载中...';gistApi('/gists/'+id,'GET').then(r=>{if(r&&r.files&&r.files['hub-data.json']){const c=JSON.parse(r.files['hub-data.json'].content);if(c&&c.modules){state=mergeState(state,c);save();renderNav();renderContent();el.textContent='✅ 已合并同步'}else el.textContent='❌ 数据格式错误'}else el.textContent='❌ 未找到数据'}).catch(e=>{el.textContent='❌ '+e.message})}
 function mergeState(local,remote){const merged={...local};merged.modules={...local.modules};
   Object.keys(remote.modules||{}).forEach(mid=>{const rm=remote.modules[mid];if(!merged.modules[mid]){merged.modules[mid]=rm;return}
-    const lm=merged.modules[mid];const items=lm.items||[];const rItems=rm.items||[];const map=new Map();items.forEach(item=>{item.updatedAt=item.updatedAt||0;if(!item.isDeleted)map.set(item.id,item)});
-    rItems.forEach(ri=>{ri.updatedAt=ri.updatedAt||0;const li=map.get(ri.id);if(li){if(ri.updatedAt>li.updatedAt&&!ri.isDeleted)map.set(ri.id,ri)}else if(!ri.isDeleted)map.set(ri.id,ri)});
-    merged.modules[mid].items=Array.from(map.values());merged.modules[mid].items.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    const lm=merged.modules[mid];const items=lm.items||[];const rItems=rm.items||[];const map=new Map();items.forEach(it=>map.set(it.id,it));
+    rItems.forEach(ri=>{const li=map.get(ri.id);if(!li||(ri.updatedAt||0)>(li.updatedAt||0))map.set(ri.id,ri)});
+    merged.modules[mid].items=Array.from(map.values()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   });
-  merged.moduleOrder=merged.moduleOrder.filter(mid=>merged.modules[mid]);remote.moduleOrder.forEach(mid=>{if(!merged.moduleOrder.includes(mid))merged.moduleOrder.push(mid)});
+  merged.moduleOrder=merged.moduleOrder||local.moduleOrder;
   return merged}
 function touch(id){const m=state.modules[currentMod];if(!m||!m.items)return;const item=m.items.find(x=>x.id===id);if(item)item.updatedAt=Date.now()}
 function gistFind(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 查找中...';gistApi('/gists?per_page=50','GET').then(list=>{const match=list.find(g=>g.files&&g.files['hub-data.json']);if(match){localStorage.setItem('ph_gist_id',match.id);el.textContent='✅ 找到备份 Gist：'+match.id;toast('✅ 找到备份，正在下载...');gistLoad()}else{el.textContent='❌ 未找到备份 Gist，请先在其他设备上传'}}).catch(e=>{el.textContent='❌ '+e.message})}
