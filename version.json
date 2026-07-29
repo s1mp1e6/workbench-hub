@@ -1,1 +1,1 @@
-{"version":"1.0.6","notes":"8 fixes: toggleItem scope, saveItemForm paper validation, metaFields DOM ID conflict, importData merge confirm, mergeState widgets/quotes sync, recalcSummary date sort, search nav stack, handwriting coordinate scaling"}
+{"version":"1.0.7","notes":"8 fixes: closeHwOverlay coord copy, saveUnifiedEdit date mapping, exportData TextEncoder, delLog async closure, keyboard select intercept, gistTest empty token, performSearch dataset delegate, doExport privacy filter"}

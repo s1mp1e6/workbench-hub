@@ -970,7 +970,7 @@ function attachLink(item){
   if(item.attType==='doc'&&item.attachment){return `<div class="tl-attach" onclick="viewImgSrc('${item.attachment.replace(/'/g,"\\'")}')">📄 文档附件</div>`}
   return '';
 }
-function delLog(lid){if(!confirm('确定删除这条记录？'))return;const el=document.querySelector('[data-lid="'+lid+'"]');if(el){el.classList.add('fade-out');setTimeout(()=>{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);item.updatedAt=Date.now();save();renderContent();renderNav();toast('已删除')}},200)}else{const m=state.modules[currentMod];const item=m.items.find(x=>x.id===detailId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);item.updatedAt=Date.now();save();renderContent();renderNav();toast('已删除')}}}
+function delLog(lid){if(!confirm('确定删除这条记录？'))return;const targetId=detailId;const el=document.querySelector('[data-lid="'+lid+'"]');if(el){el.classList.add('fade-out');setTimeout(()=>{const m=state.modules[currentMod];if(!m)return;const item=m.items.find(x=>x.id===targetId);if(item){item.logs=(item.logs||[]).filter(x=>x.id!==lid);recalcSummary(item,m.type);item.updatedAt=Date.now();save();if(detailId===targetId){renderContent();renderNav()}toast('已删除')}},200)}}
 function editLog(logId){openLogModal(detailId,logId);}
 function recalcSummary(item,type){if(!item.logs||!item.logs.length){if(type==='experiment'){item.progress=0;item.status='刚启动'}else{item.page=0}return}const sorted=[...item.logs].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id.localeCompare(a.id));const latest=sorted[0];if(type==='experiment'){item.progress=latest.progress||0;item.status=item.progress>=100?'已完成':item.progress>0?'进行中':'刚启动'}else{item.page=latest.page||0}}
 
@@ -1255,8 +1255,8 @@ function saveUnifiedEdit(){
   if(document.getElementById('f_summary'))item.summary=val('f_summary');
   if(document.getElementById('meta_tags'))item.tags=val('meta_tags').split(',').map(s=>s.trim()).filter(Boolean);
   else if(document.getElementById('f_tags'))item.tags=val('f_tags').split(',').map(s=>s.trim()).filter(Boolean);
-  if(document.getElementById('f_date'))item.date=val('f_date');
-  else if(document.getElementById('meta_date'))item.date=val('meta_date');
+  if(document.getElementById('meta_createdAt')){const dVal=val('meta_createdAt');item.createdAt=dVal;if(type==='diary'||type==='meeting')item.date=dVal}
+  else if(document.getElementById('f_date'))item.date=val('f_date');
   if(document.getElementById('f_content'))item.content=val('f_content');
   if(document.getElementById('f_name'))item.name=val('f_name');
   else if(document.getElementById('meta_name'))item.name=val('meta_name');
@@ -1418,12 +1418,7 @@ function openHwOverlay(){
 function setHwColorF(el,c){hwState.color=c;document.querySelectorAll('#hwOverlay .color-dot').forEach(d=>d.classList.remove('active'));el.classList.add('active');}
 function clearHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;const ctx=cvs.getContext('2d');ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);hwState.data=[];}
 function undoHwF(){const cvs=document.getElementById('hwCanvasF');if(!cvs)return;hwState.data.pop();const ctx=cvs.getContext('2d');ctx.fillStyle=getCanvasBg();ctx.fillRect(0,0,cvs.width,cvs.height);ctx.lineCap='round';ctx.lineJoin='round';hwState.data.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke();});}
-function closeHwOverlay(){
-  const bigCvs=document.getElementById('hwCanvasF');const smallCvs=document.getElementById('hwCanvas');
-  if(bigCvs&&smallCvs&&hwState.data.length){const box=document.getElementById('hwBox');const sw=box.clientWidth,sh=box.clientHeight;const sx=sw/bigCvs.width,sy=sh/bigCvs.height;hwState.data.forEach(s=>{s.path.forEach(p=>{p.x=Math.round(p.x*sx);p.y=Math.round(p.y*sy)})})}
-  document.getElementById('hwOverlay').classList.remove('show');
-  if(smallCvs){setTimeout(()=>{const box=document.getElementById('hwBox');resizeCanvas(smallCvs,box);redrawHw();},100)}
-}
+function closeHwOverlay(){const bigCvs=document.getElementById('hwCanvasF');const smallCvs=document.getElementById('hwCanvas');if(bigCvs&&smallCvs&&hwState.data.length){const box=document.getElementById('hwBox');const sw=box.clientWidth,sh=box.clientHeight;const sx=sw/bigCvs.width,sy=sh/bigCvs.height;const scaledData=hwState.data.map(s=>({color:s.color,width:s.width,path:s.path.map(p=>({x:Math.round(p.x*sx),y:Math.round(p.y*sy)}))}));const ctx=smallCvs.getContext('2d');ctx.clearRect(0,0,smallCvs.width,smallCvs.height);scaledData.forEach(s=>{ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width;ctx.lineCap='round';ctx.lineJoin='round';s.path.forEach((p,i)=>{if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)});ctx.stroke()})}document.getElementById('hwOverlay').classList.remove('show');}
 
 /* 保存 */
 function saveItemForm(){
@@ -1510,7 +1505,7 @@ function resetToday(){document.getElementById('modalTitle').textContent='↻ 重
   document.getElementById('mask').classList.add('show');}
 function exportData(){try{const json=JSON.stringify(state,null,2);
   // Android 原生下载
-  try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.isAndroid()){const b64=window.btoa(unescape(encodeURIComponent(json)));AndroidBridge.downloadFile('workbench_'+today()+'.json',b64);toast('⬇️ 下载中...');return}}catch(e){}
+  try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.isAndroid()){const bytes=new TextEncoder().encode(json);let binary='';for(let i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);const b64=window.btoa(binary);AndroidBridge.downloadFile('workbench_'+today()+'.json',b64);toast('⬇️ 下载中...');return}}catch(e){console.error(e)}
   const blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();
   setTimeout(()=>{try{const w=window.open(url);if(w)setTimeout(()=>w.close(),100)}catch(e){}},200);
@@ -1578,7 +1573,7 @@ function gistApi(path,method,body){// 先保存输入框中的 Token
   const inp=document.getElementById('s_gistToken');if(inp&&inp.value.trim())localStorage.setItem('ph_gist_token',inp.value.trim());
   const token=localStorage.getItem('ph_gist_token');if(!token){const s=document.getElementById('s_gistStatus');if(s)s.textContent='❌ 请先输入 GitHub Token';return Promise.reject(new Error('请先输入 GitHub Token'))}
   return fetch('https://api.github.com'+path,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):null}).then(r=>{if(r.status===401)throw new Error('Token 无效或过期，请重新生成（Fine-grained Token 需设置 Gists → Read and write）');if(r.status===403)throw new Error('Token 权限不足（Fine-grained Token 需设置 Gists → Read and write）');if(r.status===404)throw new Error('Gist 不存在');if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
-function gistTest(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 验证中...';const inp=document.getElementById('s_gistToken');if(inp&&inp.value.trim())localStorage.setItem('ph_gist_token',inp.value.trim());const token=localStorage.getItem('ph_gist_token');if(!token){el.textContent='❌ 请先输入 Token';return}fetch('https://api.github.com/user',{headers:{Authorization:'Bearer '+token,'Accept':'application/vnd.github.v3+json'}}).then(r=>{if(r.ok)r.json().then(u=>{el.innerHTML='✅ Token 有效 — 用户：'+u.login+'<br>限额剩余：'+r.headers.get('X-RateLimit-Remaining')+'/'+r.headers.get('X-RateLimit-Limit')}).catch(()=>{el.textContent='✅ Token 有效'});else if(r.status===401)el.innerHTML='❌ Token 无效或已过期，请重新生成<br>👉 生成地址：<a href=\"https://github.com/settings/tokens\" target=\"_blank\" style=\"color:var(--accent)\">github.com/settings/tokens</a><br>创建时勾选「Gists」权限 → Read and write';else el.textContent='❌ '+r.status}).catch(e=>{el.textContent='❌ 连接失败：'+e.message})}
+function gistTest(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 验证中...';const inp=document.getElementById('s_gistToken');if(inp)localStorage.setItem('ph_gist_token',inp.value.trim());const token=localStorage.getItem('ph_gist_token');if(!token){el.textContent='❌ 请先输入 Token';return}fetch('https://api.github.com/user',{headers:{Authorization:'Bearer '+token,'Accept':'application/vnd.github.v3+json'}}).then(r=>{if(r.ok)r.json().then(u=>{el.innerHTML='✅ Token 有效 — 用户：'+u.login+'<br>限额剩余：'+r.headers.get('X-RateLimit-Remaining')+'/'+r.headers.get('X-RateLimit-Limit')}).catch(()=>{el.textContent='✅ Token 有效'});else if(r.status===401)el.innerHTML='❌ Token 无效或已过期';else el.textContent='❌ '+r.status}).catch(e=>{el.textContent='❌ 连接失败：'+e.message})}
 function gistSave(){const el=document.getElementById('s_gistStatus');if(!el)return;el.textContent='⏳ 上传中...';const data=JSON.stringify(state,null,2);const gistId=localStorage.getItem('ph_gist_id');const body=gistId?{files:{'hub-data.json':{content:data}}}:{description:'Personal Hub Backup',public:false,files:{'hub-data.json':{content:data}}};(gistId?gistApi('/gists/'+gistId,'PATCH',body):gistApi('/gists','POST',body)).then(r=>{if(!gistId&&r.id){localStorage.setItem('ph_gist_id',r.id)}el.textContent='✅ 已同步';toast('☁️ 已同步到 GitHub Gist')}).catch(e=>{el.textContent='❌ '+e.message})}
 function gistLoad(){const el=document.getElementById('s_gistStatus');if(!el)return;const id=localStorage.getItem('ph_gist_id');if(!id){el.textContent='❌ 无 Gist ID';return}el.textContent='⏳ 下载中...';gistApi('/gists/'+id,'GET').then(r=>{if(r&&r.files&&r.files['hub-data.json']){const c=JSON.parse(r.files['hub-data.json'].content);if(c&&c.modules){state=mergeState(state,c);save();renderNav();renderContent();el.textContent='✅ 已合并同步'}else el.textContent='❌ 数据格式错误'}else el.textContent='❌ 未找到数据'}).catch(e=>{el.textContent='❌ '+e.message})}
 function mergeState(local,remote){const merged={...local};merged.modules={...local.modules};
@@ -1604,9 +1599,10 @@ function showShareModal(){
 }
 function doExport(){const sel=[];document.querySelectorAll('.expMod:checked').forEach(e=>sel.push(e.value));if(!sel.length){toast('请至少选择一个模块');return}
   const out=JSON.parse(JSON.stringify(state));Object.keys(out.modules).forEach(k=>{if(!sel.includes(k)&&k!=='dashboard')delete out.modules[k]});
-  out.moduleOrder=['dashboard',...sel];const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();
+  out.moduleOrder=['dashboard',...sel];
+  if(sel.length<state.moduleOrder.length-1){delete out.dashWidgets}
+  const json=JSON.stringify(out,null,2);const blob=new Blob([json],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='workbench_'+today()+'.json';document.body.appendChild(a);a.click();
   setTimeout(()=>{try{URL.revokeObjectURL(url);document.body.removeChild(a)}catch(e){}},2000);
-  navigator.share?navigator.share({title:'Personal Hub 数据',files:[new File([JSON.stringify(out,null,2)],'workbench_'+today()+'.json',{type:'application/json'})]}).catch(()=>{}):null;
   toast('✅ 已导出');closeModal()
 }
 function qrReceive(){document.getElementById('modalTitle').textContent='📥 接收数据';document.getElementById('modalBody').innerHTML='<div style="padding:10px;text-align:center;font-size:36px;margin-bottom:8px">📥</div><p style="font-size:14px;color:var(--ink);margin-bottom:10px">让对方把数据文件发给你，然后：</p><p style="font-size:16px;color:var(--ink);margin-bottom:10px">点击侧边栏底部的 <b>「⬆导入」</b> → 选择收到的 JSON 文件</p><div style="background:var(--bg);border-radius:8px;padding:12px;font-size:12px;color:var(--ink-soft)">支持微信、QQ、蓝牙等方式接收文件</div></div>';document.getElementById('modeHint').textContent='';document.getElementById('modalSave').onclick=closeModal;document.getElementById('modalSave').textContent='关闭';document.getElementById('mask').classList.add('show')}
@@ -1633,8 +1629,9 @@ function performSearch(){const q=document.getElementById('searchInput').value.to
   el.innerHTML=results.slice(0,30).map(r=>{
     const title=esc(r.item.txt||r.item.title||r.item.name||r.item.content||'(无标题)');
     const sub=esc(r.item.author||r.item.info||r.item.date||r.item.createdAt||r.name);
-    return `<div class="sr-item" onclick="closeSearch();_historyStack=[];switchMod('${r.mid.replace(/'/g,"\\'")}');${r.item.id?`openDetail('${r.item.id.replace(/'/g,"\\'")}')`:''}"><span class="sr-icon ico ${r.color||'c1'}">${r.icon}</span><div class="sr-info"><div class="sr-title">${title.slice(0,60)}</div><div class="sr-meta">${sub.slice(0,50)}</div></div><span class="sr-badge">${esc(r.name)}</span></div>`
-  }).join('')}
+    return `<div class="sr-item" data-mid="${esc(r.mid)}" data-id="${esc(r.item.id||'')}"><span class="sr-icon ico ${r.color||'c1'}">${r.icon}</span><div class="sr-info"><div class="sr-title">${title.slice(0,60)}</div><div class="sr-meta">${sub.slice(0,50)}</div></div><span class="sr-badge">${esc(r.name)}</span></div>`
+  }).join('');
+  el.querySelectorAll('.sr-item').forEach(itemEl=>{itemEl.onclick=()=>{closeSearch();_historyStack=[];const mid=itemEl.dataset.mid;const id=itemEl.dataset.id;switchMod(mid);if(id)openDetail(id)}})}
 document.getElementById('searchOverlay').addEventListener('click',e=>{if(e.target.id==='searchOverlay')closeSearch()});
 document.getElementById('searchInput').addEventListener('input',debounce(performSearch,150));
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Escape')closeSearch();if(e.key==='Enter'){const first=document.querySelector('.sr-item');if(first)first.click()}});
@@ -1652,7 +1649,7 @@ function init(){renderNav();renderContent();updateClock();setInterval(updateCloc
   document.addEventListener('keydown',function ke(e){if(e.key==='Tab'&&document.getElementById('mask').classList.contains('show')){const f=document.querySelectorAll('#modalBody input,#modalBody textarea,#modalBody select,#modalBody button:not(.x)');if(f.length){if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f[f.length-1].focus()}else if(!e.shiftKey&&document.activeElement===f[f.length-1]){e.preventDefault();f[0].focus()}}}});
   // 全局快捷键
   let gKey=false;
-  document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT'||e.target.tagName==='BUTTON'||e.target.isContentEditable)return;
     if(e.key==='Escape'){if(document.getElementById('mask').classList.contains('show')){closeModal();document.getElementById('hwOverlay').classList.remove('show')}else{document.querySelector('.sidebar.open')&&document.querySelector('.sidebar').classList.remove('open')}return}
     if(!document.getElementById('mask').classList.contains('show')){
       if(e.key==='n'||e.key==='N'){document.getElementById('fab').click()}
