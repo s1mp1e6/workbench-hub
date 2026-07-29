@@ -754,6 +754,7 @@ async function _autoExport(data){if(!_customFileHandle)return;try{const w=await 
 let _flashTimer=null;
 function flashSaved(){const el=document.getElementById('storageInfo');if(!el)return;clearTimeout(_flashTimer);const orig=el.textContent.replace(/^✓ /,'');el.textContent='✓ '+orig;_flashTimer=setTimeout(()=>{if(el.textContent.startsWith('✓ '))el.textContent=orig},800)}
 function uid(){return Math.random().toString(36).slice(2,9)}
+function getActiveItems(modOrId){const m=typeof modOrId==='string'?state.modules[modOrId]:modOrId;if(!m||!m.items)return[];return m.items.filter(x=>!x.isDeleted)}
 function esc(s){return String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function val(id){const e=document.getElementById(id);return e?e.value.trim():''}
@@ -766,7 +767,7 @@ function checkSvg(){return `<svg viewBox="0 0 16 16"><path fill="currentColor" d
 function renderNav(){
   document.getElementById('navList').innerHTML=state.moduleOrder.map(mid=>{
     const m=state.modules[mid];if(!m)return '';
-    const count=(m.items&&mid!=='dashboard')?m.items.length:0;
+    const activeItems=getActiveItems(m);const count=(m.items&&mid!=='dashboard')?activeItems.length:0;
     return `<button class="nav-item ${mid===currentMod?'active':''}" data-mid="${mid}" onclick="switchMod('${mid.replace(/'/g,"\\'")}')" aria-label="${esc(m.name)}"><span class="ni-ico ico ${m.color||'c1'}">${m.icon}</span><span class="ni-name">${esc(m.name)}</span>${count?`<span class="ni-count">${count}</span>`:''}<span class="ni-del" onclick="event.stopPropagation();editModuleMeta('${mid.replace(/'/g,"\\'")}')" title="编辑模块" aria-label="编辑模块" style="opacity:0;font-size:11px">✎</span></button>`;
   }).join('');
   // 给导航项绑定长按
@@ -827,16 +828,16 @@ function renderContent(){
   }
   if(m.type==='dashboard'){el.innerHTML=renderDashboard();bindWidgetInteractions();updateAddButton();return}
   if(m.type==='calendar'){el.innerHTML=renderCalendar(m);updateAddButton();return}
-  if(!m.items||!m.items.length){el.innerHTML=empty(`「${m.name}」还没有内容，长按卡片可编辑，拖拽可排序`,m.icon);updateAddButton();return}
+  const activeItems=getActiveItems(m);if(!activeItems.length){el.innerHTML=empty(`「${m.name}」还没有内容`,m.icon);updateAddButton();return}
   if(detailId){
     el.innerHTML=renderItemDetail(m);
     bindTimelineLp();
   }else if(m.type==='experiment'||m.type==='book'){
-    el.innerHTML=`<div class="card-list">${m.items.map(item=>renderListCard(item,m.type)).join('')}</div>`;
+    el.innerHTML=`<div class="card-list">${activeItems.map(item=>renderListCard(item,m.type)).join('')}</div>`;
   }else if(m.type==='paper'){
-    el.innerHTML=`<div class="card-grid">${m.items.map(item=>renderCard(item,m.type)).join('')}</div>`;
+    el.innerHTML=`<div class="card-grid">${activeItems.map(item=>renderCard(item,m.type)).join('')}</div>`;
   }else{
-    el.innerHTML=`<div class="card-list">${m.items.map(item=>renderCard(item,m.type)).join('')}</div>`;
+    el.innerHTML=`<div class="card-list">${activeItems.map(item=>renderCard(item,m.type)).join('')}</div>`;
   }
   bindCardInteractions();updateAddButton();
   el.classList.remove('section-fade');void el.offsetHeight;el.classList.add('section-fade');
@@ -1280,7 +1281,7 @@ function saveUnifiedEdit(){
   // 先保存内容表单（复用已有字段逻辑）
   if(type==='task'){
     const txt=val('f_txt');if(txt)item.txt=txt;
-    item.status=val('f_status');item.priority=val('f_priority');item.due=val('f_due');item.done=val('f_status')==='done';
+    item.status=val('f_status')||item.status;item.priority=val('f_priority')||item.priority;item.due=val('f_due')||item.due;item.done=(val('f_status')||item.status)==='done';
   }else if(type==='todo'){
     const txt=val('f_txt');if(txt)item.txt=txt;
     item.priority=val('f_priority');
@@ -1528,7 +1529,7 @@ function openModuleModal(){
 }
 function saveModule(){const name=val('m_name');if(!name){toast('请填写模块名称');return}const iconEl=document.querySelector('input[name="micon"]:checked');const mid='custom_'+uid();state.modules[mid]={name,icon:iconEl?iconEl.value:'📝',color:val('m_color'),type:val('m_type'),custom:true,items:[]};state.moduleOrder.push(mid);save();renderNav();closeModal();switchMod(mid);toast('模块已创建');}
 
-function viewImgSrc(src){const safe=(src||'').replace(/'/g,"\\'");const w=window.open('','_blank');w.document.write(`<title>预览</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh"></body>`);}
+function viewImgSrc(src){const w=window.open('','_blank');if(!w)return;const img=w.document.createElement('img');img.src=src;img.style.maxWidth='100%';img.style.maxHeight='100vh';w.document.body.style.cssText='margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh';w.document.body.appendChild(img)}
 
 /* 激励语（含名著搜索）*/
 function nextQuote(){state.activeQuote=(state.activeQuote+1)%state.customQuotes.length;save();renderContent()}
@@ -1679,7 +1680,7 @@ function openSearch(){document.getElementById('searchOverlay').classList.add('sh
 function closeSearch(){document.getElementById('searchOverlay').classList.remove('show')}
 function performSearch(){const q=document.getElementById('searchInput').value.toLowerCase().trim();const el=document.getElementById('searchResults');if(!q){el.innerHTML='<div class="sr-empty">输入关键词搜索所有模块内容</div>';return}
   const results=[];state.moduleOrder.filter(mid=>mid!=='dashboard').forEach(mid=>{const m=state.modules[mid];if(!m||!m.items)return;(m.items||[]).forEach(item=>{
-    const fields=[item.txt,item.title,item.name,item.content,item.summary,item.note,item.feeling,item.author,item.info];let match=fields.some(f=>f&&f.toLowerCase().includes(q));if(!match&&item.tags)match=item.tags.some(t=>t.toLowerCase().includes(q));if(match)results.push({mid,name:m.name,icon:m.icon,color:m.color,item})})});
+    const fields=[item.txt,item.title,item.name,item.content,item.summary,item.note,item.feeling,item.author,item.info];let match=fields.some(f=>f&&f.toLowerCase().includes(q));if(!match&&item.tags)match=item.tags.some(t=>t.toLowerCase().includes(q));if(!match&&item.logs)match=item.logs.some(l=>(l.note&&l.note.toLowerCase().includes(q))||(l.feeling&&l.feeling.toLowerCase().includes(q)));if(match)results.push({mid,name:m.name,icon:m.icon,color:m.color,item})})});
   results.sort((a,b)=>(a.item.done||0)-(b.item.done||0));
   if(!results.length){el.innerHTML='<div class="sr-empty">😕 没有找到匹配的内容</div>';return}
   el.innerHTML=results.slice(0,30).map(r=>{
