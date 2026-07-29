@@ -173,6 +173,9 @@
   .chart-wrap h4{font-size:12px;color:var(--ink-faint);font-weight:600;margin-bottom:8px}
   .chart-wrap canvas{display:block;width:100%;height:160px;border-radius:6px}
   *:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  .loading-spinner{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px}
+  .loading-spinner::before{content:'';width:32px;height:32px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   @media print{body{background:#fff!important}.sidebar,.topbar,.fab,.fab-tip,.theme-toggle,.menu-toggle,.mask,.lp-menu,.search-overlay,.toast{display:none!important}.main{margin-left:0!important}.content{padding:0!important}.dash-hero{box-shadow:none!important;border:1px solid #ddd!important;padding:20px!important}.card{break-inside:avoid!important;box-shadow:none!important;border:1px solid #ddd!important}}
   .cal{user-select:none;max-width:520px;margin:0 auto}
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -751,7 +754,7 @@ function uid(){return Math.random().toString(36).slice(2,9)}
 function esc(s){return String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function val(id){const e=document.getElementById(id);return e?e.value.trim():''}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('undo');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),1800)}
+function toast(msg){try{if(navigator.vibrate)navigator.vibrate(8)}catch(e){}const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('undo');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),1800)}
 function toastUndo(msg,onUndo){const t=document.getElementById('toast');t.innerHTML=msg+'<button class="toast-undo" onclick="this.parentElement._undo()">撤销</button>';t.classList.add('undo','show');clearTimeout(t._timer);t._undo=()=>{onUndo();t.classList.remove('show')};t._timer=setTimeout(()=>t.classList.remove('show'),5000)}
 function empty(msg,emoji='📭'){return `<div class="empty"><span class="emoji">${emoji}</span>${msg}</div>`}
 function checkSvg(){return `<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6.2 11.2L3 8l1.4-1.4 1.8 1.8L11.6 3 13 4.4z"/></svg>`}
@@ -1704,6 +1707,8 @@ function init(){renderNav();renderContent();updateClock();setInterval(updateCloc
   const savedTheme=localStorage.getItem('ph_theme_mode');if(savedTheme==='dark')document.documentElement.classList.add('dark');
   applyTheme(localStorage.getItem('ph_theme_color')||'default');
   updateThemeBtn();
+  // 自动备份（每5分钟保存一份快照到 localStorage backup 槽）
+  setInterval(()=>{try{localStorage.setItem(KEY+'_backup',JSON.stringify(state))}catch(e){}},300000);
 }
 function toggleTheme(){document.documentElement.classList.toggle('dark');localStorage.setItem('ph_theme_mode',document.documentElement.classList.contains('dark')?'dark':'light');updateThemeBtn()}
 function updateThemeBtn(){const btn=document.getElementById('themeToggle');if(btn)btn.textContent=document.documentElement.classList.contains('dark')?'☀️':'🌙'}
